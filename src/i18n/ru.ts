@@ -15,6 +15,12 @@ export const ru: Messages = {
     newPuzzle: 'Новый пазл',
     network: 'Состояние сети',
     about: 'О сайте',
+    menu: 'Меню',
+    close: 'Закрыть',
+  },
+  fullscreen: {
+    enter: 'На весь экран',
+    exit: 'Выйти из полноэкранного режима',
   },
   language: {
     button: 'Язык',

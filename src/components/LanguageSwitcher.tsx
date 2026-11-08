@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { LOCALE_LABELS, LOCALES, type Locale } from '../i18n/locale.ts'
 import { useI18n } from '../i18n/useI18n.ts'
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({ labeled = false }: { labeled?: boolean }) {
   const { locale, setLocale, messages } = useI18n()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [open, setOpen] = useState(false)
@@ -30,13 +30,16 @@ export function LanguageSwitcher() {
     <>
       <button
         type="button"
-        className="world-button"
+        className={
+          labeled ? 'world-button world-button--labeled' : 'world-button'
+        }
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={messages.language.button}
         onClick={show}
       >
         <WorldIcon />
+        {labeled ? <span>{messages.language.button}</span> : null}
       </button>
       <dialog
         ref={dialogRef}

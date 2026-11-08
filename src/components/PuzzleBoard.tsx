@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { FullscreenButton } from './FullscreenButton.tsx'
 import { useI18n } from '../i18n/useI18n.ts'
 import { buildPuzzle, type PieceModel, type Point } from '../puzzle/cut.ts'
 import {
@@ -314,6 +315,8 @@ function PuzzleTable({
   const viewRef = useRef(view)
   const dragRef = useRef<Drag | null>(null)
   const panRef = useRef<Pan | null>(null)
+  const pinchActiveRef = useRef(false)
+  const finishDragRef = useRef<(commit: boolean) => void>(() => {})
   const userAdjustedRef = useRef(false)
   const viewportRef = useRef<HTMLDivElement>(null)
 
@@ -429,6 +432,111 @@ function PuzzleTable({
     return () => viewport.removeEventListener('wheel', onWheel)
   }, [area, layout])
 
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const points: ScreenPoint[] = []
+    let pinch: PinchSpan | null = null
+
+    const applyPinch = (prev: PinchSpan, next: PinchSpan) => {
+      const current = viewRef.current
+      if (!current || prev.dist < 12 || next.dist < 12) return
+      const rect = viewport.getBoundingClientRect()
+      const limits = cameraLimits(
+        rect.width,
+        rect.height,
+        area,
+        Math.min(layout.cellW, layout.cellH),
+      )
+      const zoomed = zoomCamera(
+        current,
+        prev.x - rect.left,
+        prev.y - rect.top,
+        next.dist / prev.dist,
+        limits.min,
+        limits.max,
+      )
+      const camera = {
+        zoom: zoomed.zoom,
+        x: zoomed.x + (next.x - prev.x),
+        y: zoomed.y + (next.y - prev.y),
+      }
+      userAdjustedRef.current = true
+      viewRef.current = camera
+      setView(camera)
+    }
+
+    const onDown = (event: PointerEvent) => {
+      if (isScreenControl(event.target)) return
+      if (event.pointerType === 'mouse' && event.button !== 0) return
+      if (points.some((point) => point.id === event.pointerId)) return
+      points.push({
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        target: event.target,
+      })
+      if (points.length < 2) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (points.length > 2) return
+      finishDragRef.current(true)
+      panRef.current = null
+      setPanning(false)
+      for (const point of points) releaseCaptured(viewport, point)
+      pinchActiveRef.current = true
+      pinch = pinchSpan(points)
+    }
+
+    const onMove = (event: PointerEvent) => {
+      const point = points.find((item) => item.id === event.pointerId)
+      if (!point) return
+      point.x = event.clientX
+      point.y = event.clientY
+      if (!pinchActiveRef.current) return
+      const next = pinchSpan(points)
+      if (!next || !pinch) return
+      event.preventDefault()
+      event.stopPropagation()
+      applyPinch(pinch, next)
+      pinch = next
+    }
+
+    const onUp = (event: PointerEvent) => {
+      const index = points.findIndex((point) => point.id === event.pointerId)
+      if (index < 0) return
+      const pinching = pinchActiveRef.current
+      points.splice(index, 1)
+      if (!pinching) return
+      event.stopPropagation()
+      if (points.length >= 2) {
+        pinch = pinchSpan(points)
+        return
+      }
+      pinch = null
+      pinchActiveRef.current = false
+    }
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (event.touches.length < 2) return
+      event.preventDefault()
+    }
+
+    viewport.addEventListener('pointerdown', onDown, { capture: true })
+    viewport.addEventListener('pointermove', onMove, { capture: true })
+    viewport.addEventListener('pointerup', onUp, { capture: true })
+    viewport.addEventListener('pointercancel', onUp, { capture: true })
+    viewport.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => {
+      pinchActiveRef.current = false
+      viewport.removeEventListener('pointerdown', onDown, { capture: true })
+      viewport.removeEventListener('pointermove', onMove, { capture: true })
+      viewport.removeEventListener('pointerup', onUp, { capture: true })
+      viewport.removeEventListener('pointercancel', onUp, { capture: true })
+      viewport.removeEventListener('touchmove', onTouchMove)
+    }
+  }, [area, layout])
+
   function commitView(next: Camera) {
     viewRef.current = next
     setView(next)
@@ -469,6 +577,10 @@ function PuzzleTable({
     if (commit) onDragEnd(placementsRef.current)
     else onDragCancel()
   }
+
+  useEffect(() => {
+    finishDragRef.current = finishDrag
+  })
 
   useEffect(() => {
     const onPageHide = () => {
@@ -554,7 +666,7 @@ function PuzzleTable({
   }
 
   function onViewportPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (dragRef.current) return
+    if (pinchActiveRef.current || dragRef.current) return
     if (event.button !== 0 && event.button !== 1) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -568,6 +680,7 @@ function PuzzleTable({
   }
 
   function onViewportPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (pinchActiveRef.current) return
     const pan = panRef.current
     if (!pan || pan.pointerId !== event.pointerId) return
     if (event.buttons === 0) {
@@ -601,6 +714,7 @@ function PuzzleTable({
     event: React.PointerEvent<HTMLCanvasElement>,
     id: string,
   ) {
+    if (pinchActiveRef.current) return
     if (event.button !== 0) return
     const point = playPoint(event)
     const placement = placementsRef.current.find((piece) => piece.id === id)
@@ -627,6 +741,7 @@ function PuzzleTable({
   }
 
   function onPointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (pinchActiveRef.current) return
     const drag = dragRef.current
     if (!drag || event.pointerId !== drag.pointerId) return
     if (event.buttons === 0) {
@@ -809,6 +924,7 @@ function PuzzleTable({
         >
           {messages.play.back}
         </button>
+        <FullscreenButton className="play-mode__fullscreen" />
       </div>
     </div>
   )
@@ -951,6 +1067,47 @@ interface Pan {
   pointerId: number
   x: number
   y: number
+}
+
+interface ScreenPoint {
+  id: number
+  x: number
+  y: number
+  target: EventTarget | null
+}
+
+interface PinchSpan {
+  dist: number
+  x: number
+  y: number
+}
+
+function pinchSpan(points: readonly ScreenPoint[]): PinchSpan | null {
+  const first = points[0]
+  const second = points[1]
+  if (!first || !second) return null
+  return {
+    dist: Math.hypot(second.x - first.x, second.y - first.y),
+    x: (first.x + second.x) / 2,
+    y: (first.y + second.y) / 2,
+  }
+}
+
+function isScreenControl(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('button, a, input, textarea, select, label') !== null
+  )
+}
+
+function releaseCaptured(viewport: HTMLElement, point: ScreenPoint): void {
+  const target = point.target
+  if (target instanceof Element && target.hasPointerCapture(point.id)) {
+    target.releasePointerCapture(point.id)
+  }
+  if (viewport.hasPointerCapture(point.id)) {
+    viewport.releasePointerCapture(point.id)
+  }
 }
 
 function drawPiece(

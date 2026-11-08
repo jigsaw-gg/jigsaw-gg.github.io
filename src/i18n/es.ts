@@ -6,6 +6,12 @@ export const es: Messages = {
     newPuzzle: 'Nuevo puzle',
     network: 'Estado de la red',
     about: 'Acerca de',
+    menu: 'Menú',
+    close: 'Cerrar',
+  },
+  fullscreen: {
+    enter: 'Pantalla completa',
+    exit: 'Salir de pantalla completa',
   },
   language: {
     button: 'Idioma',

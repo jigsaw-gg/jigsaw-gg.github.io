@@ -6,6 +6,12 @@ export const en: Messages = {
     newPuzzle: 'New puzzle',
     network: 'Network status',
     about: 'About',
+    menu: 'Menu',
+    close: 'Close',
+  },
+  fullscreen: {
+    enter: 'Full screen',
+    exit: 'Exit full screen',
   },
   language: {
     button: 'Language',

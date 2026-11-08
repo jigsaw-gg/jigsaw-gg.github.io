@@ -4,6 +4,12 @@ export interface Messages {
     newPuzzle: string
     network: string
     about: string
+    menu: string
+    close: string
+  }
+  fullscreen: {
+    enter: string
+    exit: string
   }
   language: {
     button: string

@@ -13,6 +13,7 @@ import {
   readPlayerName,
   writePlayerName,
 } from '../playerName.ts'
+import { fullscreenElement, isImmersive, setImmersive } from '../fullscreen.ts'
 import { chooseGrid } from '../puzzle/cut.ts'
 import { normalizeSessionId } from '../puzzle/session.ts'
 import { usePuzzleSession } from '../puzzle/usePuzzleSession.ts'
@@ -124,14 +125,22 @@ function PlaySession({
     if (!playing) return
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    const header = document.querySelector('.topbar')
+    if (header instanceof HTMLElement) header.inert = true
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (fullscreenElement()) return
+      if (isImmersive()) {
+        setImmersive(false)
+        return
+      }
       setPlaying(false)
       window.requestAnimationFrame(() => playRef.current?.focus())
     }
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = previous
+      if (header instanceof HTMLElement) header.inert = false
       window.removeEventListener('keydown', onKey)
     }
   }, [playing])

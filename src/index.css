@@ -85,4 +85,17 @@ code {
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
+}
+
+html.is-immersive,
+html.is-immersive body,
+html.is-immersive #root,
+html.is-immersive .app {
+  min-height: 100dvh;
+}
+
+html:fullscreen,
+html:-webkit-full-screen {
+  background: var(--bg);
 }
