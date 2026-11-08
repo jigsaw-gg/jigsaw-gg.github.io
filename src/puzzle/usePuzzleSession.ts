@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Channel } from '@apinator/client'
-import { apinator } from '../apinator.ts'
+import { apinator, type RealtimeChannel } from '../apinator.ts'
 import { normalizePlayerName } from '../playerName.ts'
 import {
   parseSetup,
@@ -198,7 +197,7 @@ export function usePuzzleSession(
   }
 }
 
-function sendOffer(channel: Channel, setup: PuzzleSetup): void {
+function sendOffer(channel: RealtimeChannel, setup: PuzzleSetup): void {
   if (!channel.subscribed) return
   try {
     channel.trigger(OFFER_EVENT, setup)

@@ -3,6 +3,7 @@ import {
   APINATOR_CHANNEL,
   APINATOR_CLUSTER,
   APINATOR_EVENT,
+  APINATOR_MOCK,
   type ApinatorSnapshot,
 } from '../apinator.ts'
 import { connectionLabel, connectionTone } from '../connectionStatus.ts'
@@ -76,7 +77,10 @@ export function HomePage({ status }: { status: ApinatorSnapshot }) {
           <div>
             <dt>App key</dt>
             <dd>
-              <code>{APINATOR_APP_KEY || 'Not configured'}</code>
+              <code>
+                {APINATOR_APP_KEY ||
+                  (APINATOR_MOCK ? 'Development mock' : 'Not configured')}
+              </code>
             </dd>
           </div>
         </dl>

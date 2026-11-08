@@ -1,7 +1,8 @@
 import { createHmac } from 'node:crypto'
-import { copyFileSync } from 'node:fs'
+import { copyFileSync, readFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 
@@ -150,13 +151,35 @@ function sendJson(
   res.end(JSON.stringify(body))
 }
 
-export default defineConfig(({ mode }) => ({
-  // jigsaw-gg.github.io is served from the domain root.
-  base: '/',
-  plugins: [react(), githubPagesSpaFallback(), apinatorAuthPlugin(mode)],
-  define: {
-    'import.meta.env.VITE_APINATOR_APP_KEY': JSON.stringify(
-      resolveAppKey(mode),
-    ),
-  },
-}))
+function worktreeDevPort(): number | undefined {
+  try {
+    const path = resolve(
+      fileURLToPath(new URL('.', import.meta.url)),
+      '.worktree-port',
+    )
+    const raw = readFileSync(path, 'utf8').trim()
+    const port = Number(raw)
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return undefined
+    return port
+  } catch {
+    return undefined
+  }
+}
+
+export default defineConfig(({ mode }) => {
+  const port = worktreeDevPort()
+  return {
+    // jigsaw-gg.github.io is served from the domain root.
+    base: '/',
+    server:
+      port === undefined
+        ? undefined
+        : { host: '127.0.0.1', port, strictPort: true },
+    plugins: [react(), githubPagesSpaFallback(), apinatorAuthPlugin(mode)],
+    define: {
+      'import.meta.env.VITE_APINATOR_APP_KEY': JSON.stringify(
+        resolveAppKey(mode),
+      ),
+    },
+  }
+})
