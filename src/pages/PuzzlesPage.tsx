@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
 import {
@@ -12,6 +12,7 @@ import {
   createSessionId,
   DEFAULT_IMAGE_URL,
   DEFAULT_PIECE_COUNT,
+  GALLERY_IMAGE_URLS,
   writeSession,
   type PuzzleSetup,
 } from '../puzzle/session.ts'
@@ -27,6 +28,8 @@ export function PuzzlesPage() {
     height: number
   } | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const galleryButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -73,6 +76,12 @@ export function PuzzlesPage() {
     navigate(`/play/${sessionId}`)
   }
 
+  function pickGalleryImage(url: string) {
+    setImageUrl(url)
+    setGalleryOpen(false)
+    galleryButtonRef.current?.focus()
+  }
+
   return (
     <main className="page">
       <h1>New puzzle</h1>
@@ -103,6 +112,41 @@ export function PuzzlesPage() {
             spellCheck={false}
           />
         </label>
+        <div className="gallery-pick">
+          <button
+            ref={galleryButtonRef}
+            type="button"
+            className="button"
+            aria-expanded={galleryOpen}
+            aria-controls={galleryOpen ? 'puzzle-gallery' : undefined}
+            onClick={() => setGalleryOpen((open) => !open)}
+          >
+            Pick from gallery
+          </button>
+          {galleryOpen && (
+            <ul className="gallery" id="puzzle-gallery">
+              {GALLERY_IMAGE_URLS.map((url, index) => {
+                const selected = imageUrl.trim() === url
+                return (
+                  <li key={url}>
+                    <button
+                      type="button"
+                      className={
+                        selected
+                          ? 'gallery__choice gallery__choice--selected'
+                          : 'gallery__choice'
+                      }
+                      aria-pressed={selected}
+                      onClick={() => pickGalleryImage(url)}
+                    >
+                      <img src={url} alt={`Gallery image ${index + 1}`} />
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
         <label className="field">
           <span>Pieces</span>
           <input
