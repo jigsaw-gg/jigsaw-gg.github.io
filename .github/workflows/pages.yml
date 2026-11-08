@@ -1,6 +1,8 @@
 # Build Vite app and deploy to GitHub Pages.
-# Set repository variable APINATOR_APP_KEY (Settings → Secrets and variables → Actions → Variables).
-# The build exposes it to the client as VITE_APINATOR_APP_KEY. Do not read it from secrets.
+# Set repository variables APINATOR_APP_KEY and APINATOR_APP_SECRET
+# (Settings → Secrets and variables → Actions → Variables).
+# The build inlines both. The page signs private-channel subscriptions
+# locally; GitHub Pages has no auth route. Do not read either value from secrets.
 #
 # Also enable Pages: Settings → Pages → Build and deployment → Source: GitHub Actions.
 
@@ -36,9 +38,15 @@ jobs:
       - name: Build
         env:
           VITE_APINATOR_APP_KEY: ${{ vars.APINATOR_APP_KEY }}
+          APINATOR_APP_SECRET: ${{ vars.APINATOR_APP_SECRET }}
         run: |
           if [ -z "${VITE_APINATOR_APP_KEY}" ]; then
             echo "::error::Repository variable APINATOR_APP_KEY is not set."
+            echo "Define it under Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+          if [ -z "${APINATOR_APP_SECRET}" ]; then
+            echo "::error::Repository variable APINATOR_APP_SECRET is not set."
             echo "Define it under Settings → Secrets and variables → Actions → Variables."
             exit 1
           fi

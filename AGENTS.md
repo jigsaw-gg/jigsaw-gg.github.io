@@ -29,15 +29,17 @@ When working in a worktree:
 
 The app key is public. Vite inlines it from `VITE_APINATOR_APP_KEY` or `APINATOR_APP_KEY` (local `.env`, or the `APINATOR_APP_KEY` repository variable in `.github/workflows/pages.yml`). Keep the key out of source files. The Pages build reads that variable only and fails when it is missing.
 
-`APINATOR_APP_SECRET` stays in the Node process. The Vite dev and preview servers use it to sign `POST /api/realtime/auth`. The published site is static and has no such route. Leave the secret out of client code, `define`, and the bundle.
+`APINATOR_APP_SECRET` is inlined the same way, from `VITE_APINATOR_APP_SECRET` or `APINATOR_APP_SECRET` (local `.env`, or the `APINATOR_APP_SECRET` repository variable). The Pages build fails when it is missing. Keep it out of source files. It is present in the built JavaScript: each private-channel subscription is signed in the browser with the live socket id. That signature is the handshake Apinator requires before it relays client events. It is not an access boundary.
+
+The browser answers `POST /api/realtime/auth` locally and does not send it to GitHub Pages. The Vite dev and preview servers still sign that route when the client bundle has no secret.
 
 A worktree has no `.env`. With no app key, `vite` uses the in-browser mock in `src/apinatorMock.ts`: the connection is local, events reach other tabs on this machine, and nothing is sent to Apinator. Leave the worktree on that mock.
 
-Client events go on private channels, use a `client-*` name, and are not echoed back to the sender.
+Client events go on private channels, use a `client-*` name, and are not echoed back to the sender. The channel name is what separates sessions. Do not add an invite salt or extra traffic signing.
 
 ## Puzzle sessions
 
-The invite path is `/play/<id>`. New ids are 21-character NanoIDs; older UUIDs still resolve. The channel name is `private-puzzle-<id>`.
+The invite path is `/play/<id>`. New ids are 21-character NanoIDs; older UUIDs still resolve. The channel name is `private-puzzle-<id>`. One channel per session, so a client only sends and receives that session's events. The `private-` prefix is what lets Apinator relay those client events. Knowing the channel name is enough to join.
 
 Setup (image URL, pixel size, piece count, seed) is stored under `jigsaw-session:<id>` and shared with `client-session-request` and `client-session-offer`.
 

@@ -1,4 +1,5 @@
 import { Apinator, type ConnectionState } from '@apinator/client'
+import { APINATOR_APP_SECRET, installLocalPuzzleAuth } from './apinatorAuth.ts'
 import { createMockApinator } from './apinatorMock.ts'
 import { i18nError } from './i18n/errors.ts'
 
@@ -113,6 +114,10 @@ export function subscribeApinatorStatus(listener: () => void): () => void {
 
 export function getApinatorStatus(): ApinatorSnapshot {
   return snapshot
+}
+
+if (APINATOR_APP_KEY && APINATOR_APP_SECRET) {
+  installLocalPuzzleAuth(APINATOR_APP_KEY, APINATOR_APP_SECRET)
 }
 
 export const apinator: RealtimeClient | null = APINATOR_APP_KEY

@@ -21,7 +21,6 @@ function githubPagesSpaFallback(): Plugin {
 /**
  * Public client key. GitHub Actions sets VITE_APINATOR_APP_KEY from the
  * APINATOR_APP_KEY repository variable. Locally, `.env` may use either name.
- * APINATOR_APP_SECRET is never forwarded into the client bundle.
  */
 function resolveAppKey(mode: string): string {
   const fileEnv = loadEnv(mode, process.cwd(), '')
@@ -30,6 +29,22 @@ function resolveAppKey(mode: string): string {
     process.env.APINATOR_APP_KEY ||
     fileEnv.VITE_APINATOR_APP_KEY ||
     fileEnv.APINATOR_APP_KEY ||
+    ''
+  return raw.trim()
+}
+
+/**
+ * Signs private-channel subscriptions in the browser. GitHub Actions sets
+ * APINATOR_APP_SECRET from the repository variable of the same name. The
+ * signature is Apinator's client-event handshake, not an access boundary.
+ */
+function resolveAppSecret(mode: string): string {
+  const fileEnv = loadEnv(mode, process.cwd(), '')
+  const raw =
+    process.env.VITE_APINATOR_APP_SECRET ||
+    process.env.APINATOR_APP_SECRET ||
+    fileEnv.VITE_APINATOR_APP_SECRET ||
+    fileEnv.APINATOR_APP_SECRET ||
     ''
   return raw.trim()
 }
@@ -51,8 +66,8 @@ type ConnectServer = {
 }
 
 /**
- * Signs private puzzle-channel subscriptions. The app secret stays in this
- * Node process and is never written into the client bundle.
+ * Signs private puzzle-channel subscriptions when the client bundle has no
+ * secret. The published page signs this route itself.
  */
 function apinatorAuthPlugin(mode: string): Plugin {
   const env = loadEnv(mode, process.cwd(), '')
@@ -179,6 +194,9 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_APINATOR_APP_KEY': JSON.stringify(
         resolveAppKey(mode),
+      ),
+      'import.meta.env.VITE_APINATOR_APP_SECRET': JSON.stringify(
+        resolveAppSecret(mode),
       ),
     },
   }
