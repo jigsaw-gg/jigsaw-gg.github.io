@@ -341,10 +341,21 @@
 }
 
 .setup-layout {
+  --setup-form: 40ch;
+  --setup-preview: 44rem;
+  --setup-gap: 1.75rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30vw;
-  column-gap: 1.75rem;
+  grid-template-columns: minmax(0, var(--setup-form)) minmax(
+      0,
+      var(--setup-preview)
+    );
+  column-gap: var(--setup-gap);
   align-items: stretch;
+  width: min(
+    100%,
+    calc(var(--setup-form) + var(--setup-preview) + var(--setup-gap))
+  );
+  margin-inline: auto;
 }
 
 .setup-layout__form {
@@ -378,8 +389,9 @@
 
 @media (max-width: 720px) {
   .setup-layout {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, var(--setup-form));
     row-gap: 1rem;
+    width: min(100%, var(--setup-form));
   }
 
   .setup-preview {
