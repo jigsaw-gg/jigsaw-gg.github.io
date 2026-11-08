@@ -1,20 +1,28 @@
 import { execFileSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
-import { copyFileSync, readFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 
-/** GitHub Pages serves 404.html for unknown paths and keeps the request URL. */
+/**
+ * GitHub Pages serves 404.html for unknown paths with status 404, which
+ * drops link previews. play/index.html is a real file, so /play/?id=… is 200
+ * and crawlers can read the static invite tags. 404.html still boots /play/<id>.
+ */
 function githubPagesSpaFallback(): Plugin {
   return {
     name: 'github-pages-spa-fallback',
     apply: 'build',
     writeBundle() {
       const outDir = resolve('dist')
-      copyFileSync(resolve(outDir, 'index.html'), resolve(outDir, '404.html'))
+      const index = resolve(outDir, 'index.html')
+      copyFileSync(index, resolve(outDir, '404.html'))
+      const playDir = resolve(outDir, 'play')
+      mkdirSync(playDir, { recursive: true })
+      copyFileSync(index, resolve(playDir, 'index.html'))
     },
   }
 }

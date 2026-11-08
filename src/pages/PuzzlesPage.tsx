@@ -14,6 +14,7 @@ import {
   DEFAULT_IMAGE_URL,
   DEFAULT_PIECE_COUNT,
   GALLERY_IMAGE_URLS,
+  playInvitePath,
   writeSession,
   type PuzzleSetup,
 } from '../puzzle/session.ts'
@@ -82,7 +83,7 @@ export function PuzzlesPage() {
       seed,
     }
     writeSession(sessionId, setup)
-    navigate(`/play/${sessionId}`)
+    navigate(playInvitePath(sessionId))
   }
 
   function pickGalleryImage(url: string) {

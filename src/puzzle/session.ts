@@ -26,6 +26,11 @@ export function createSessionId(): string {
   return nanoid(SESSION_ID_LENGTH)
 }
 
+/** Shareable path. /play/ is a real file on Pages, so this URL returns 200. */
+export function playInvitePath(sessionId: string): string {
+  return `/play/?id=${encodeURIComponent(sessionId)}`
+}
+
 export function normalizeSessionId(value: string): string | null {
   const id = value.trim()
   if (NANO_ID.test(id)) return id

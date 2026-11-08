@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
 import { PuzzleBoard } from '../components/PuzzleBoard.tsx'
 import { localizeError } from '../i18n/errors.ts'
@@ -16,13 +16,15 @@ import {
 } from '../playerName.ts'
 import { fullscreenElement, isImmersive, setImmersive } from '../fullscreen.ts'
 import { chooseGrid } from '../puzzle/cut.ts'
-import { normalizeSessionId } from '../puzzle/session.ts'
+import { normalizeSessionId, playInvitePath } from '../puzzle/session.ts'
 import { usePuzzleSession } from '../puzzle/usePuzzleSession.ts'
 import { useWorldSync } from '../puzzle/useWorldSync.ts'
 
 export function PlayPage() {
   const { messages } = useI18n()
-  const { sessionId: rawId } = useParams()
+  const { sessionId: pathId } = useParams()
+  const [search] = useSearchParams()
+  const rawId = pathId ?? search.get('id') ?? ''
   const sessionId = rawId ? normalizeSessionId(rawId) : null
   if (!sessionId) {
     return (
@@ -112,7 +114,7 @@ function PlaySession({
     setup,
     players,
   )
-  const inviteUrl = `${window.location.origin}/play/${sessionId}`
+  const inviteUrl = `${window.location.origin}${playInvitePath(sessionId)}`
   const [copied, setCopied] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [keepBoard, setKeepBoard] = useState(false)
