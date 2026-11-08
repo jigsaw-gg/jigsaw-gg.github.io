@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { PlayerNameField } from '../components/PlayerNameField.tsx'
+import {
+  normalizePlayerName,
+  readPlayerName,
+  rememberConfirmedPlayerName,
+  writePlayerName,
+} from '../playerName.ts'
 import {
   createSessionId,
   DEFAULT_IMAGE_URL,
@@ -10,6 +17,7 @@ import {
 
 export function PuzzlesPage() {
   const navigate = useNavigate()
+  const [playerName, setPlayerName] = useState(readPlayerName)
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE_URL)
   const [pieceCount, setPieceCount] = useState(String(DEFAULT_PIECE_COUNT))
   const [seed] = useState(() => crypto.getRandomValues(new Uint32Array(1))[0])
@@ -40,10 +48,13 @@ export function PuzzlesPage() {
 
   const count = Number(pieceCount)
   const countOk = Number.isInteger(count) && count >= 1 && count <= 200
-  const canStart = imageSize !== null && countOk
+  const name = normalizePlayerName(playerName)
+  const canStart = imageSize !== null && countOk && name !== null
 
   function start() {
-    if (!imageSize || !countOk) return
+    if (!imageSize || !countOk || !name) return
+    writePlayerName(name)
+    rememberConfirmedPlayerName(name)
     const sessionId = createSessionId()
     const setup: PuzzleSetup = {
       imageUrl: imageUrl.trim(),
@@ -60,8 +71,9 @@ export function PuzzlesPage() {
     <main className="page">
       <h1>New puzzle</h1>
       <p className="lede">
-        Pick an image and how many pieces to cut. The seed is chosen here. Start
-        opens a private session and an invite link.
+        Pick an image and how many pieces to cut. Choose the name other players
+        will see. The seed is chosen here. Start opens a private session and an
+        invite link.
       </p>
       <form
         className="setup"
@@ -70,6 +82,11 @@ export function PuzzlesPage() {
           start()
         }}
       >
+        <PlayerNameField
+          value={playerName}
+          onChange={setPlayerName}
+          autoFocus
+        />
         <label className="field">
           <span>Image URL</span>
           <input

@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { PlayerNameField } from '../components/PlayerNameField.tsx'
 import { PuzzleBoard } from '../components/PuzzleBoard.tsx'
+import {
+  clearConfirmedPlayerName,
+  normalizePlayerName,
+  peekConfirmedPlayerName,
+  readPlayerId,
+  readPlayerName,
+  writePlayerName,
+} from '../playerName.ts'
 import { chooseGrid } from '../puzzle/cut.ts'
 import { normalizeSessionId } from '../puzzle/session.ts'
 import { usePuzzleSession } from '../puzzle/usePuzzleSession.ts'
@@ -18,12 +27,67 @@ export function PlayPage() {
       </main>
     )
   }
-  return <PlaySession sessionId={sessionId} />
+  return <PlayEntry sessionId={sessionId} />
 }
 
-function PlaySession({ sessionId }: { sessionId: string }) {
-  const { setup, phase, channelError, channelName, source } =
-    usePuzzleSession(sessionId)
+function PlayEntry({ sessionId }: { sessionId: string }) {
+  const [routedName] = useState(peekConfirmedPlayerName)
+  const [playerName, setPlayerName] = useState(
+    () => routedName ?? readPlayerName(),
+  )
+  const [confirmedName, setConfirmedName] = useState<string | null>(routedName)
+
+  useEffect(() => {
+    if (!routedName) return
+    // Drop the one-time skip after this page mounts. A later open asks again.
+    const timer = window.setTimeout(clearConfirmedPlayerName, 0)
+    return () => window.clearTimeout(timer)
+  }, [routedName])
+
+  if (!confirmedName) {
+    const name = normalizePlayerName(playerName)
+    return (
+      <main className="page">
+        <h1>Join puzzle</h1>
+        <p className="lede">
+          Choose the name other players will see before entering this session.
+        </p>
+        <form
+          className="setup"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!name) return
+            writePlayerName(name)
+            setPlayerName(name)
+            setConfirmedName(name)
+          }}
+        >
+          <PlayerNameField
+            value={playerName}
+            onChange={setPlayerName}
+            autoFocus
+          />
+          <button type="submit" className="button" disabled={name === null}>
+            Join
+          </button>
+        </form>
+      </main>
+    )
+  }
+
+  return <PlaySession sessionId={sessionId} playerName={confirmedName} />
+}
+
+function PlaySession({
+  sessionId,
+  playerName,
+}: {
+  sessionId: string
+  playerName: string
+}) {
+  const [playerId] = useState(readPlayerId)
+  const { setup, phase, channelError, channelName, source, players } =
+    usePuzzleSession(sessionId, { id: playerId, name: playerName })
   const inviteUrl = `${window.location.origin}/play/${sessionId}`
   const [copied, setCopied] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -32,6 +96,7 @@ function PlaySession({ sessionId }: { sessionId: string }) {
   const grid = setup
     ? chooseGrid(setup.pieceCount, setup.imageWidth, setup.imageHeight)
     : null
+  const others = players.filter((player) => !player.self)
 
   useEffect(() => {
     if (!playing) return
@@ -80,6 +145,20 @@ function PlaySession({ sessionId }: { sessionId: string }) {
               ? 'Setup is saved in this browser. Connected players can request it.'
               : 'Waiting for a connected player who already has this session.'}
         </p>
+        <section className="players-block" aria-label="Players">
+          <h2>Players</h2>
+          <ul className="players">
+            {players.map((player) => (
+              <li key={player.id}>
+                {player.name}
+                {player.self ? ' (you)' : ''}
+              </li>
+            ))}
+          </ul>
+          {others.length === 0 && (
+            <p className="muted">Waiting for other players to join.</p>
+          )}
+        </section>
         <section className="invite">
           <label className="field">
             <span>Invite link</span>

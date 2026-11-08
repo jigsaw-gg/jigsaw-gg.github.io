@@ -295,7 +295,15 @@
   color: var(--muted);
 }
 
+.field__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .field input {
+  width: 100%;
   font: inherit;
   color: var(--text);
   background: var(--surface);
@@ -357,6 +365,40 @@
 .invite .field {
   flex: 1;
   margin-bottom: 0;
+}
+
+.players-block {
+  margin-bottom: 1.25rem;
+}
+
+.players-block h2 {
+  margin: 0 0 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.players li {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.players-block .muted {
+  margin: 0.55rem 0 0;
 }
 
 .play-mode {
