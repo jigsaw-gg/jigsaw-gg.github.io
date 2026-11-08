@@ -1,0 +1,60 @@
+# Build Vite app and deploy to GitHub Pages.
+# Set repository secret APINATOR_APP_KEY (Settings → Secrets and variables → Actions → Secrets).
+# The build exposes it to the client as VITE_APINATOR_APP_KEY.
+#
+# Also enable Pages: Settings → Pages → Build and deployment → Source: GitHub Actions.
+
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Build
+        env:
+          VITE_APINATOR_APP_KEY: ${{ secrets.APINATOR_APP_KEY }}
+        run: |
+          if [ -z "${VITE_APINATOR_APP_KEY}" ]; then
+            echo "::error::Repository secret APINATOR_APP_KEY is not set."
+            echo "Define it under Settings → Secrets and variables → Actions → Secrets."
+            exit 1
+          fi
+          npm run build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
