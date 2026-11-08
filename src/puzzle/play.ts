@@ -35,8 +35,8 @@ export interface ScatteredBoard {
 }
 
 export interface NearPair {
-  pieceId: string
-  neighborId: string
+  group: string
+  neighborGroup: string
 }
 
 export function pieceId(col: number, row: number): string {
@@ -320,7 +320,7 @@ export function pullToNeighbors(
         placements: current,
         near:
           closest && closest.distance < highlight
-            ? { pieceId: closest.pieceId, neighborId: closest.neighborId }
+            ? { group, neighborGroup: closest.neighborGroup }
             : null,
         snapped,
       }

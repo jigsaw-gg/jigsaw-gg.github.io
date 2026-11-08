@@ -650,8 +650,9 @@ function PuzzleTable({
                   placement={placement}
                   layout={layout}
                   near={
-                    near?.pieceId === placement.id ||
-                    near?.neighborId === placement.id
+                    near !== null &&
+                    (placement.group === near.group ||
+                      placement.group === near.neighborGroup)
                   }
                   offsetX={slide?.x ?? 0}
                   offsetY={slide?.y ?? 0}
