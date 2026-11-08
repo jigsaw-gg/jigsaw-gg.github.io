@@ -27,7 +27,7 @@ When working in a worktree:
 
 ## Apinator
 
-The app key is public. Vite inlines it from `VITE_APINATOR_APP_KEY` or `APINATOR_APP_KEY` (local `.env`, or the `APINATOR_APP_KEY` repository secret in `.github/workflows/pages.yml`). Keep the key out of source files.
+The app key is public. Vite inlines it from `VITE_APINATOR_APP_KEY` or `APINATOR_APP_KEY` (local `.env`, or the `APINATOR_APP_KEY` repository variable in `.github/workflows/pages.yml`). Keep the key out of source files. The Pages build reads that variable only and fails when it is missing.
 
 `APINATOR_APP_SECRET` stays in the Node process. The Vite dev and preview servers use it to sign `POST /api/realtime/auth`. The published site is static and has no such route. Leave the secret out of client code, `define`, and the bundle.
 

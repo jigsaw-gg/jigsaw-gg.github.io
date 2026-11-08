@@ -20,7 +20,7 @@ function githubPagesSpaFallback(): Plugin {
 
 /**
  * Public client key. GitHub Actions sets VITE_APINATOR_APP_KEY from the
- * APINATOR_APP_KEY secret. Locally, `.env` may use either name.
+ * APINATOR_APP_KEY repository variable. Locally, `.env` may use either name.
  * APINATOR_APP_SECRET is never forwarded into the client bundle.
  */
 function resolveAppKey(mode: string): string {

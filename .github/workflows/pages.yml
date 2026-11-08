@@ -1,6 +1,6 @@
 # Build Vite app and deploy to GitHub Pages.
-# Set repository secret APINATOR_APP_KEY (Settings → Secrets and variables → Actions → Secrets).
-# The build exposes it to the client as VITE_APINATOR_APP_KEY.
+# Set repository variable APINATOR_APP_KEY (Settings → Secrets and variables → Actions → Variables).
+# The build exposes it to the client as VITE_APINATOR_APP_KEY. Do not read it from secrets.
 #
 # Also enable Pages: Settings → Pages → Build and deployment → Source: GitHub Actions.
 
@@ -35,11 +35,11 @@ jobs:
         run: npm ci
       - name: Build
         env:
-          VITE_APINATOR_APP_KEY: ${{ secrets.APINATOR_APP_KEY }}
+          VITE_APINATOR_APP_KEY: ${{ vars.APINATOR_APP_KEY }}
         run: |
           if [ -z "${VITE_APINATOR_APP_KEY}" ]; then
-            echo "::error::Repository secret APINATOR_APP_KEY is not set."
-            echo "Define it under Settings → Secrets and variables → Actions → Secrets."
+            echo "::error::Repository variable APINATOR_APP_KEY is not set."
+            echo "Define it under Settings → Secrets and variables → Actions → Variables."
             exit 1
           fi
           npm run build
