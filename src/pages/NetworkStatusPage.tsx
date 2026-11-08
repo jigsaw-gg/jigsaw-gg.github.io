@@ -28,7 +28,7 @@ function formatTime(iso: string, locale: string): string {
 
 function subscriptionLabel(
   status: ApinatorSnapshot,
-  text: Messages['home'],
+  text: Messages['network'],
 ): string {
   if (status.subscription === 'error') return text.failed
   if (status.subscription === 'subscribed' && status.state === 'connected') {
@@ -38,9 +38,9 @@ function subscriptionLabel(
   return text.waiting
 }
 
-export function HomePage({ status }: { status: ApinatorSnapshot }) {
+export function NetworkStatusPage({ status }: { status: ApinatorSnapshot }) {
   const { locale, messages } = useI18n()
-  const text = messages.home
+  const text = messages.network
   const tone = connectionTone(status.state)
   return (
     <main className="page">

@@ -3,8 +3,8 @@ import type { Messages } from './types.ts'
 export const es: Messages = {
   nav: {
     primary: 'Principal',
-    home: 'Inicio',
-    puzzles: 'Puzles',
+    newPuzzle: 'Nuevo puzle',
+    network: 'Estado de la red',
     about: 'Acerca de',
   },
   language: {
@@ -26,9 +26,9 @@ export const es: Messages = {
     unavailable: 'No disponible',
     pill: (label) => `Apinator ${label}`,
   },
-  home: {
-    title: 'Jigsaw',
-    lede: 'Página de inicio provisional de jigsaw-gg.github.io. La navegación y el cambio de tema ya funcionan; el explorador de puzles llegará más adelante.',
+  network: {
+    title: 'Estado de la red',
+    lede: 'Conexión con Apinator en este navegador: clúster, canal, suscripción y mensajes recientes.',
     cluster: 'Clúster',
     channel: 'Canal',
     event: 'Evento',
@@ -46,7 +46,7 @@ export const es: Messages = {
   },
   about: {
     title: 'Acerca de',
-    lede: 'Página de información provisional. Este sitio estará en jigsaw-gg.github.io. La cabecera cambia entre sistema, claro y oscuro, y la página de inicio muestra la conexión con Apinator.',
+    lede: 'Página de información provisional. Este sitio estará en jigsaw-gg.github.io. La cabecera cambia entre sistema, claro y oscuro, y la página de estado de la red muestra la conexión con Apinator.',
   },
   puzzles: {
     title: 'Nuevo puzle',

@@ -10,7 +10,7 @@ import { LanguageSwitcher } from './components/LanguageSwitcher.tsx'
 import { ThemeSwitcher } from './components/ThemeSwitcher.tsx'
 import { useI18n } from './i18n/useI18n.ts'
 import { AboutPage } from './pages/AboutPage.tsx'
-import { HomePage } from './pages/HomePage.tsx'
+import { NetworkStatusPage } from './pages/NetworkStatusPage.tsx'
 import { PlayPage } from './pages/PlayPage.tsx'
 import { PuzzlesPage } from './pages/PuzzlesPage.tsx'
 import { useApinatorStatus } from './useApinatorStatus.ts'
@@ -33,16 +33,20 @@ export default function App() {
             <ThemeSwitcher />
             <nav className="topbar__nav" aria-label={messages.nav.primary}>
               <NavLink to="/" end>
-                {messages.nav.home}
+                {messages.nav.newPuzzle}
               </NavLink>
-              <NavLink to="/puzzles">{messages.nav.puzzles}</NavLink>
+              <NavLink to="/network">{messages.nav.network}</NavLink>
               <NavLink to="/about">{messages.nav.about}</NavLink>
             </nav>
           </div>
         </header>
         <Routes>
-          <Route path="/" element={<HomePage status={status} />} />
-          <Route path="/puzzles" element={<PuzzlesPage />} />
+          <Route path="/" element={<PuzzlesPage />} />
+          <Route
+            path="/network"
+            element={<NetworkStatusPage status={status} />}
+          />
+          <Route path="/puzzles" element={<Navigate to="/" replace />} />
           <Route path="/play/:sessionId" element={<PlayPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

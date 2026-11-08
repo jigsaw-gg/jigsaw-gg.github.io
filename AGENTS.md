@@ -47,6 +47,6 @@ Outer piece edges stay on the image rectangle. Inner edges are the seeded cuts. 
 
 ## GitHub Pages
 
-`base` in `vite.config.ts` stays `/`. The build copies `dist/index.html` to `dist/404.html` so `/puzzles` and `/play/...` survive a refresh.
+`base` in `vite.config.ts` stays `/`. The build copies `dist/index.html` to `dist/404.html` so `/network` and `/play/...` survive a refresh. `/` is the new-puzzle form, and `/puzzles` redirects there.
 
 If `actions/deploy-pages` returns 404, turn Pages on in the repository settings and set the source to GitHub Actions. The workflow cannot enable Pages itself.

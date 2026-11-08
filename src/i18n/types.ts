@@ -1,8 +1,8 @@
 export interface Messages {
   nav: {
     primary: string
-    home: string
-    puzzles: string
+    newPuzzle: string
+    network: string
     about: string
   }
   language: {
@@ -24,7 +24,7 @@ export interface Messages {
     unavailable: string
     pill: (label: string) => string
   }
-  home: {
+  network: {
     title: string
     lede: string
     cluster: string

@@ -12,8 +12,8 @@ function ruPieces(count: number): string {
 export const ru: Messages = {
   nav: {
     primary: 'Основная',
-    home: 'Главная',
-    puzzles: 'Пазлы',
+    newPuzzle: 'Новый пазл',
+    network: 'Состояние сети',
     about: 'О сайте',
   },
   language: {
@@ -35,9 +35,9 @@ export const ru: Messages = {
     unavailable: 'Недоступно',
     pill: (label) => `Apinator ${label}`,
   },
-  home: {
-    title: 'Jigsaw',
-    lede: 'Временная главная страница jigsaw-gg.github.io. Навигация и переключатель темы уже работают; каталог пазлов появится позже.',
+  network: {
+    title: 'Состояние сети',
+    lede: 'Соединение с Apinator в этом браузере: кластер, канал, подписка и недавние сообщения.',
     cluster: 'Кластер',
     channel: 'Канал',
     event: 'Событие',
@@ -55,7 +55,7 @@ export const ru: Messages = {
   },
   about: {
     title: 'О сайте',
-    lede: 'Временная страница. Сайт будет на jigsaw-gg.github.io. В шапке переключается системная, светлая и тёмная тема, а на главной показана связь с Apinator.',
+    lede: 'Временная страница. Сайт будет на jigsaw-gg.github.io. В шапке переключается системная, светлая и тёмная тема, а на странице состояния сети показана связь с Apinator.',
   },
   puzzles: {
     title: 'Новый пазл',
