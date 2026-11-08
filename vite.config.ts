@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
 import { copyFileSync, readFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -166,6 +167,34 @@ function sendJson(
   res.end(JSON.stringify(body))
 }
 
+/**
+ * Short commit and `git log -1` text. The Pages workflow plants
+ * BUILD_COMMIT (first 6 characters of GITHUB_SHA) and BUILD_COMMIT_LOG.
+ * A local build reads git when those are absent.
+ */
+function resolveBuildInfo(): { commit: string; log: string } {
+  const planted = (process.env.BUILD_COMMIT ?? '').trim()
+  if (planted) {
+    return {
+      commit: planted.slice(0, 6),
+      log: (process.env.BUILD_COMMIT_LOG ?? '').trim(),
+    }
+  }
+  try {
+    const full = execFileSync('git', ['rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const log = execFileSync('git', ['--no-pager', 'log', '-1', '--no-color'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return { commit: full.slice(0, 6), log }
+  } catch {
+    return { commit: '', log: '' }
+  }
+}
+
 function worktreeDevPort(): number | undefined {
   try {
     const path = resolve(
@@ -183,6 +212,7 @@ function worktreeDevPort(): number | undefined {
 
 export default defineConfig(({ mode }) => {
   const port = worktreeDevPort()
+  const build = resolveBuildInfo()
   return {
     // jigsaw-gg.github.io is served from the domain root.
     base: '/',
@@ -198,6 +228,8 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_APINATOR_APP_SECRET': JSON.stringify(
         resolveAppSecret(mode),
       ),
+      'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(build.commit),
+      'import.meta.env.VITE_BUILD_COMMIT_LOG': JSON.stringify(build.log),
     },
   }
 })

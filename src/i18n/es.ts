@@ -53,6 +53,9 @@ export const es: Messages = {
   about: {
     title: 'Acerca de',
     lede: 'Página de información provisional. Este sitio estará en jigsaw-gg.github.io. La cabecera cambia entre sistema, claro y oscuro, y la página de estado de la red muestra la conexión con Apinator.',
+    version: 'Versión',
+    commitShow: 'Ver commit',
+    commitHide: 'Ocultar commit',
   },
   puzzles: {
     title: 'Nuevo puzle',

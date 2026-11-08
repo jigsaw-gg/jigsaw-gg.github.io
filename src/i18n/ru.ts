@@ -62,6 +62,9 @@ export const ru: Messages = {
   about: {
     title: 'О сайте',
     lede: 'Временная страница. Сайт будет на jigsaw-gg.github.io. В шапке переключается системная, светлая и тёмная тема, а на странице состояния сети показана связь с Apinator.',
+    version: 'Версия',
+    commitShow: 'Показать коммит',
+    commitHide: 'Скрыть коммит',
   },
   puzzles: {
     title: 'Новый пазл',

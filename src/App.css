@@ -399,6 +399,61 @@
   line-height: 1.5;
 }
 
+.about-version {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+
+.about-version__label {
+  color: var(--muted);
+}
+
+.about-version__commit {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.about-commit {
+  position: relative;
+  max-width: 40rem;
+}
+
+.about-commit__log {
+  margin: 0;
+  max-height: 6.6rem;
+  overflow: hidden;
+  padding: 0.9rem 1rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 38%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, #000 0%, #000 38%, transparent 100%);
+}
+
+.about-commit--open .about-commit__log {
+  max-height: none;
+  overflow: visible;
+  padding-bottom: 0.9rem;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.about-commit__toggle {
+  min-height: 2.75rem;
+  margin-top: 0.75rem;
+}
+
 .muted {
   color: var(--muted);
 }

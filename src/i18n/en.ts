@@ -53,6 +53,9 @@ export const en: Messages = {
   about: {
     title: 'About',
     lede: 'Dummy about page. This site will live at jigsaw-gg.github.io. The header switches between system, light, and dark, and the network status page shows the Apinator connection.',
+    version: 'Version',
+    commitShow: 'Show commit',
+    commitHide: 'Hide commit',
   },
   puzzles: {
     title: 'New puzzle',

@@ -51,6 +51,9 @@ export interface Messages {
   about: {
     title: string
     lede: string
+    version: string
+    commitShow: string
+    commitHide: string
   }
   puzzles: {
     title: string

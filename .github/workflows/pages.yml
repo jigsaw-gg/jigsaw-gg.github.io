@@ -4,6 +4,9 @@
 # The build inlines both. The page signs private-channel subscriptions
 # locally; GitHub Pages has no auth route. Do not read either value from secrets.
 #
+# The same build plants the first 6 characters of the commit and the
+# `git log -1` text as Vite constants for the About page.
+#
 # Also enable Pages: Settings → Pages → Build and deployment → Source: GitHub Actions.
 
 name: Deploy GitHub Pages
@@ -50,6 +53,8 @@ jobs:
             echo "Define it under Settings → Secrets and variables → Actions → Variables."
             exit 1
           fi
+          export BUILD_COMMIT="${GITHUB_SHA:0:6}"
+          export BUILD_COMMIT_LOG="$(git --no-pager log -1 --no-color)"
           npm run build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
