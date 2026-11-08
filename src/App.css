@@ -467,6 +467,12 @@
   margin: 4.5rem 1rem 0;
 }
 
+@property --piece-glow {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
 .piece {
   position: absolute;
   display: block;
@@ -474,12 +480,20 @@
   background: transparent;
   touch-action: none;
   pointer-events: auto;
+  --piece-glow: 0;
+  filter: drop-shadow(
+      0 0 calc(3px * var(--piece-glow)) rgb(255 246 216 / var(--piece-glow))
+    )
+    drop-shadow(
+      0 0 calc(8px * var(--piece-glow))
+        color-mix(
+          in srgb,
+          var(--accent) calc(var(--piece-glow) * 100%),
+          transparent
+        )
+    );
 }
 
 .piece--dragging {
   cursor: grabbing;
-}
-
-.piece--near {
-  filter: drop-shadow(0 0 3px #fff6d8) drop-shadow(0 0 8px var(--accent));
 }

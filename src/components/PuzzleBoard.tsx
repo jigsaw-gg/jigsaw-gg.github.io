@@ -17,6 +17,76 @@ import {
 } from '../puzzle/play.ts'
 import type { PuzzleSetup } from '../puzzle/session.ts'
 
+/** Nearby-piece glow fade, in milliseconds. */
+const GLOW_MS = 260
+/**
+ * Critically damped snap, in rad/s. The piece speeds up toward the join,
+ * then settles on it.
+ */
+const SNAP_RESPONSE = 22
+
+interface SlideOffset {
+  x: number
+  y: number
+  vx: number
+  vy: number
+}
+
+function allowsMotion(): boolean {
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function settleSlide(body: SlideOffset, dt: number): void {
+  const response = SNAP_RESPONSE
+  const decay = Math.exp(-response * dt)
+  const carryX = body.vx + response * body.x
+  const carryY = body.vy + response * body.y
+  body.x = (body.x + carryX * dt) * decay
+  body.y = (body.y + carryY * dt) * decay
+  body.vx = (body.vx - response * carryX * dt) * decay
+  body.vy = (body.vy - response * carryY * dt) * decay
+}
+
+function slideResting(body: SlideOffset): boolean {
+  return Math.hypot(body.x, body.y) < 0.2 && Math.hypot(body.vx, body.vy) < 4
+}
+
+function easeInOut(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+}
+
+function useFade(active: boolean): number {
+  const motion = allowsMotion()
+  const [value, setValue] = useState(active ? 1 : 0)
+  const valueRef = useRef(value)
+
+  useEffect(() => {
+    const to = active ? 1 : 0
+    const from = valueRef.current
+    if (Math.abs(from - to) < 0.001) return
+    if (!motion) {
+      const frame = requestAnimationFrame(() => {
+        valueRef.current = to
+        setValue(to)
+      })
+      return () => cancelAnimationFrame(frame)
+    }
+    const start = performance.now()
+    let frame = 0
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / GLOW_MS)
+      const next = from + (to - from) * easeInOut(t)
+      valueRef.current = next
+      setValue(next)
+      if (t < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [active, motion])
+
+  return value
+}
+
 export function PuzzleBoard({
   setup,
   active,
@@ -57,6 +127,11 @@ function PuzzleTable({
   const [frontGroup, setFrontGroup] = useState<string | null>(null)
   const [dragGroup, setDragGroup] = useState<string | null>(null)
   const [panning, setPanning] = useState(false)
+  const offsetsRef = useRef(new Map<string, SlideOffset>())
+  const slideFrameRef = useRef(0)
+  const [offsets, setOffsets] = useState<ReadonlyMap<string, SlideOffset>>(
+    () => new Map(),
+  )
   const area = useMemo(
     () => playArea(layout.playW, layout.playH),
     [layout.playW, layout.playH],
@@ -95,6 +170,10 @@ function PuzzleTable({
       cancelled = true
     }
   }, [setup.imageUrl])
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(slideFrameRef.current)
+  }, [])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -170,6 +249,53 @@ function PuzzleTable({
     dragRef.current = null
     setDragGroup(null)
     setNear(null)
+  }
+
+  function beginSlide() {
+    if (slideFrameRef.current) return
+    let last = performance.now()
+    const tick = (now: number) => {
+      const dt = Math.min(0.034, (now - last) / 1000)
+      last = now
+      const map = offsetsRef.current
+      for (const [id, body] of map) {
+        settleSlide(body, dt)
+        if (slideResting(body)) map.delete(id)
+      }
+      setOffsets(new Map(map))
+      if (map.size === 0) {
+        slideFrameRef.current = 0
+        return
+      }
+      slideFrameRef.current = requestAnimationFrame(tick)
+    }
+    slideFrameRef.current = requestAnimationFrame(tick)
+  }
+
+  function launchSnap(before: Placement[], after: Placement[]) {
+    if (!allowsMotion()) return
+    const afterById = new Map(after.map((piece) => [piece.id, piece]))
+    let nudged = false
+    for (const piece of before) {
+      const next = afterById.get(piece.id)
+      if (!next) continue
+      const dx = piece.x - next.x
+      const dy = piece.y - next.y
+      if (Math.hypot(dx, dy) < 0.2) continue
+      const body = offsetsRef.current.get(piece.id) ?? {
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+      }
+      body.x += dx
+      body.y += dy
+      offsetsRef.current.set(piece.id, body)
+      nudged = true
+    }
+    if (!nudged) return
+    setOffsets(new Map(offsetsRef.current))
+    beginSlide()
   }
 
   function endPan(event: React.PointerEvent<HTMLDivElement>) {
@@ -303,6 +429,7 @@ function PuzzleTable({
     setPlacements(placements)
     setNear(result.near)
     setFrontGroup(drag.group)
+    if (result.snapped) launchSnap(moved, placements)
   }
 
   function onPointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
@@ -367,6 +494,7 @@ function PuzzleTable({
                 (item) => item.col === piece.col && item.row === piece.row,
               )
               if (!placement) return null
+              const slide = offsets.get(placement.id)
               return (
                 <PieceCanvas
                   key={placement.id}
@@ -378,6 +506,8 @@ function PuzzleTable({
                     near?.pieceId === placement.id ||
                     near?.neighborId === placement.id
                   }
+                  offsetX={slide?.x ?? 0}
+                  offsetY={slide?.y ?? 0}
                   raised={placement.group === frontGroup}
                   dragging={placement.group === dragGroup}
                   onPointerDown={onPointerDown}
@@ -407,6 +537,8 @@ function PieceCanvas({
   placement,
   layout,
   near,
+  offsetX,
+  offsetY,
   raised,
   dragging,
   onPointerDown,
@@ -418,6 +550,8 @@ function PieceCanvas({
   placement: Placement
   layout: ScatteredBoard
   near: boolean
+  offsetX: number
+  offsetY: number
   raised: boolean
   dragging: boolean
   onPointerDown: (
@@ -438,13 +572,24 @@ function PieceCanvas({
     drawPiece(canvas, image, piece, cellW, cellH, pad)
   }, [image, piece, cellW, cellH, pad])
 
-  const className = [
-    'piece',
-    near ? 'piece--near' : '',
-    dragging ? 'piece--dragging' : '',
-  ]
+  const glow = useFade(near)
+  const className = ['piece', dragging ? 'piece--dragging' : '']
     .filter(Boolean)
     .join(' ')
+  const shift =
+    Math.hypot(offsetX, offsetY) > 0.05
+      ? `translate(${offsetX}px, ${offsetY}px)`
+      : undefined
+  const style: React.CSSProperties & { '--piece-glow': number } = {
+    left: placement.x - pad,
+    top: placement.y - pad,
+    width,
+    height,
+    zIndex: raised ? 3 : near || glow > 0.04 ? 2 : 1,
+    transform: shift,
+    '--piece-glow': glow,
+  }
+  if (glow <= 0.01) style.filter = 'none'
 
   return (
     <canvas
@@ -455,13 +600,7 @@ function PieceCanvas({
       data-piece={placement.id}
       data-near={near ? 'true' : 'false'}
       aria-label={`Piece ${piece.row + 1}-${piece.col + 1}`}
-      style={{
-        left: placement.x - pad,
-        top: placement.y - pad,
-        width,
-        height,
-        zIndex: raised ? 3 : near ? 2 : 1,
-      }}
+      style={style}
       onPointerDown={(event) => onPointerDown(event, placement.id)}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
