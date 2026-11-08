@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
+import { useI18n } from '../i18n/useI18n.ts'
 import {
   normalizePlayerName,
   readPlayerName,
@@ -19,6 +20,8 @@ import {
 
 export function PuzzlesPage() {
   const navigate = useNavigate()
+  const { messages } = useI18n()
+  const text = messages.puzzles
   const [playerName, setPlayerName] = useState(readPlayerName)
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE_URL)
   const [pieceCount, setPieceCount] = useState(String(DEFAULT_PIECE_COUNT))
@@ -27,7 +30,7 @@ export function PuzzlesPage() {
     width: number
     height: number
   } | null>(null)
-  const [imageError, setImageError] = useState<string | null>(null)
+  const [imageFailed, setImageFailed] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const galleryButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -37,12 +40,12 @@ export function PuzzlesPage() {
     img.onload = () => {
       if (cancelled) return
       setImageSize({ width: img.naturalWidth, height: img.naturalHeight })
-      setImageError(null)
+      setImageFailed(false)
     }
     img.onerror = () => {
       if (cancelled) return
       setImageSize(null)
-      setImageError('Could not load that image.')
+      setImageFailed(true)
     }
     img.src = imageUrl.trim()
     return () => {
@@ -84,12 +87,8 @@ export function PuzzlesPage() {
 
   return (
     <main className="page">
-      <h1>New puzzle</h1>
-      <p className="lede">
-        Pick an image and how many pieces to cut. Choose the name other players
-        will see. The seed is chosen here. Start opens a private session and an
-        invite link.
-      </p>
+      <h1>{text.title}</h1>
+      <p className="lede">{text.lede}</p>
       <form
         className="setup"
         onSubmit={(event) => {
@@ -103,7 +102,7 @@ export function PuzzlesPage() {
           autoFocus
         />
         <label className="field">
-          <span>Image URL</span>
+          <span>{text.imageUrl}</span>
           <input
             value={imageUrl}
             onChange={(event) => setImageUrl(event.target.value)}
@@ -121,7 +120,7 @@ export function PuzzlesPage() {
             aria-controls={galleryOpen ? 'puzzle-gallery' : undefined}
             onClick={() => setGalleryOpen((open) => !open)}
           >
-            Pick from gallery
+            {text.gallery}
           </button>
           {galleryOpen && (
             <ul className="gallery" id="puzzle-gallery">
@@ -139,7 +138,7 @@ export function PuzzlesPage() {
                       aria-pressed={selected}
                       onClick={() => pickGalleryImage(url)}
                     >
-                      <img src={url} alt={`Gallery image ${index + 1}`} />
+                      <img src={url} alt={text.galleryImage(index + 1)} />
                     </button>
                   </li>
                 )
@@ -148,7 +147,7 @@ export function PuzzlesPage() {
           )}
         </div>
         <label className="field">
-          <span>Pieces</span>
+          <span>{text.pieces}</span>
           <input
             value={pieceCount}
             onChange={(event) => setPieceCount(event.target.value)}
@@ -157,41 +156,39 @@ export function PuzzlesPage() {
         </label>
         <dl className="facts setup__facts">
           <div>
-            <dt>Image size</dt>
+            <dt>{text.imageSize}</dt>
             <dd>
               {imageSize
                 ? `${imageSize.width} × ${imageSize.height}`
-                : imageError
-                  ? 'Unavailable'
-                  : 'Loading…'}
+                : imageFailed
+                  ? text.unavailable
+                  : text.loading}
             </dd>
           </div>
           <div>
-            <dt>Arrangement</dt>
+            <dt>{text.arrangement}</dt>
             <dd>
               {grid && actualPieces !== null
-                ? `${grid.cols} × ${grid.rows} · ${actualPieces} ${
-                    actualPieces === 1 ? 'piece' : 'pieces'
-                  }`
+                ? `${grid.cols} × ${grid.rows} · ${text.pieceCount(actualPieces)}`
                 : countOk
-                  ? imageError
-                    ? 'Unavailable'
-                    : 'Loading…'
+                  ? imageFailed
+                    ? text.unavailable
+                    : text.loading
                   : '—'}
             </dd>
           </div>
           <div>
-            <dt>Seed</dt>
+            <dt>{text.seed}</dt>
             <dd>{seed}</dd>
           </div>
         </dl>
-        {imageError && (
+        {imageFailed && (
           <p className="banner banner--error" role="alert">
-            {imageError}
+            {text.imageError}
           </p>
         )}
         <button type="submit" className="button" disabled={!canStart}>
-          Start
+          {text.start}
         </button>
       </form>
     </main>

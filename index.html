@@ -8,6 +8,34 @@
     <script>
       ;(function () {
         try {
+          var stored = localStorage.getItem('jigsaw-gg-locale')
+          var locale =
+            stored === 'en' || stored === 'es' || stored === 'ru' ? stored : ''
+          if (!locale) {
+            var list =
+              navigator.languages && navigator.languages.length
+                ? navigator.languages
+                : [navigator.language || 'en']
+            locale = 'en'
+            for (var i = 0; i < list.length; i++) {
+              var base = String(list[i] || '')
+                .toLowerCase()
+                .split('-')[0]
+              if (base === 'en' || base === 'es' || base === 'ru') {
+                locale = base
+                break
+              }
+            }
+          }
+          document.documentElement.lang = locale
+        } catch (_) {
+          document.documentElement.lang = 'en'
+        }
+      })()
+    </script>
+    <script>
+      ;(function () {
+        try {
           var key = 'jigsaw-gg-theme'
           var pref = localStorage.getItem(key)
           if (pref !== 'light' && pref !== 'dark' && pref !== 'system') {

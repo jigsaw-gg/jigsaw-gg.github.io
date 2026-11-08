@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useI18n } from '../i18n/useI18n.ts'
 import { buildPuzzle, type PieceModel, type Point } from '../puzzle/cut.ts'
 import {
   approachLimits,
@@ -162,6 +163,7 @@ function PuzzleTable({
   onDragEnd: (placements: Placement[]) => void
   onDragCancel: () => void
 }) {
+  const { messages } = useI18n()
   const model = useMemo(() => buildPuzzle(setup), [setup])
   const layout = useMemo(
     () => scatterPieces(model, setup.seed),
@@ -604,7 +606,7 @@ function PuzzleTable({
         ref={viewportRef}
         className={viewportClass}
         role="application"
-        aria-label="Play area"
+        aria-label={messages.play.playArea}
         data-zoom={view.zoom}
         onPointerDown={onViewportPointerDown}
         onPointerMoveCapture={onViewportPointerMoveCapture}
@@ -614,9 +616,7 @@ function PuzzleTable({
         onAuxClick={(event) => event.preventDefault()}
       >
         {failed ? (
-          <p className="banner banner--error">
-            Could not load the puzzle image.
-          </p>
+          <p className="banner banner--error">{messages.play.imageError}</p>
         ) : (
           <div
             className="play-world"
@@ -688,7 +688,7 @@ function PuzzleTable({
           onPointerDown={(event) => event.stopPropagation()}
           onClick={onLeave}
         >
-          Back
+          {messages.play.back}
         </button>
       </div>
     </div>
@@ -725,6 +725,7 @@ function PieceCanvas({
   onPointerMove: (event: React.PointerEvent<HTMLCanvasElement>) => void
   onPointerUp: (event: React.PointerEvent<HTMLCanvasElement>) => void
 }) {
+  const { messages } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { cellW, cellH, pad } = layout
   const width = cellW + pad * 2
@@ -763,7 +764,7 @@ function PieceCanvas({
       role="img"
       data-piece={placement.id}
       data-near={near ? 'true' : 'false'}
-      aria-label={`Piece ${piece.row + 1}-${piece.col + 1}`}
+      aria-label={messages.play.piece(piece.row + 1, piece.col + 1)}
       style={style}
       onPointerDown={(event) => onPointerDown(event, placement.id)}
       onPointerMove={onPointerMove}
@@ -780,12 +781,13 @@ function RemotePointer({
   cursor: RemoteCursor
   zoom: number
 }) {
+  const { messages } = useI18n()
   const scale = zoom > 0 ? 1 / zoom : 1
   return (
     <div
       className="remote-cursor"
       role="img"
-      aria-label={`${cursor.name}'s pointer`}
+      aria-label={messages.play.pointer(cursor.name)}
       style={{
         left: cursor.x,
         top: cursor.y,

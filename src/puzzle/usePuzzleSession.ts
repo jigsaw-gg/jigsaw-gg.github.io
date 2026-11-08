@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { apinator, type RealtimeChannel } from '../apinator.ts'
-import { releasePuzzleChannel, retainPuzzleChannel } from './channelRetain.ts'
+import { i18nError } from '../i18n/errors.ts'
 import { normalizePlayerName } from '../playerName.ts'
+import { releasePuzzleChannel, retainPuzzleChannel } from './channelRetain.ts'
 import {
   parseSetup,
   puzzleChannelName,
@@ -60,7 +61,7 @@ export function usePuzzleSession(
     if (!client) {
       const frame = window.setTimeout(() => {
         setPhase('error')
-        setChannelError('App key is not set.')
+        setChannelError(i18nError('appKeyMissing'))
       }, 0)
       return () => window.clearTimeout(frame)
     }
@@ -228,5 +229,5 @@ function subscriptionError(data: unknown): string {
     if (typeof record.message === 'string' && record.message)
       return record.message
   }
-  return 'Could not join the private channel.'
+  return i18nError('channelJoin')
 }

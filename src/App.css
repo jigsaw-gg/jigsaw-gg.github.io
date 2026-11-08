@@ -46,6 +46,8 @@
 
 .topbar__nav a:focus-visible,
 .theme-switcher__option:focus-visible,
+.world-button:focus-visible,
+.language-dialog__option:focus-visible,
 .topbar__brand:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -81,6 +83,91 @@
 .theme-switcher__option--active {
   background: var(--theme-switcher-active-bg);
   color: var(--text);
+}
+
+.world-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.world-button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.world-button__icon {
+  display: block;
+}
+
+.language-dialog {
+  width: min(22rem, calc(100vw - 2rem));
+  margin: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+}
+
+.language-dialog::backdrop {
+  background: rgb(8 10 14 / 0.55);
+}
+
+.language-dialog__panel {
+  padding: 1.25rem 1.25rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.22);
+}
+
+.language-dialog__panel h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1.15rem;
+}
+
+.language-dialog__options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.language-dialog__option {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+}
+
+.language-dialog__option:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.language-dialog__option--active {
+  border-color: var(--accent);
+  background: var(--theme-switcher-active-bg);
+  color: var(--text);
+}
+
+.language-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .conn-pill {

@@ -1,5 +1,6 @@
 import { Apinator, type ConnectionState } from '@apinator/client'
 import { createMockApinator } from './apinatorMock.ts'
+import { i18nError } from './i18n/errors.ts'
 
 function readAppKey(): string {
   const raw = import.meta.env.VITE_APINATOR_APP_KEY
@@ -85,7 +86,7 @@ function errorText(data: unknown): string {
   try {
     return JSON.stringify(data)
   } catch {
-    return 'Connection error'
+    return i18nError('connection')
   }
 }
 
@@ -189,6 +190,6 @@ if (apinator) {
     socketId: null,
     subscription: 'error',
     events: [],
-    error: 'App key is not set.',
+    error: i18nError('appKeyMissing'),
   }
 }

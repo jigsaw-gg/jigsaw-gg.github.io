@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '../apinator.ts'
+import { useI18n } from '../i18n/useI18n.ts'
 import { buildPuzzle } from './cut.ts'
 import { releasePuzzleChannel, retainPuzzleChannel } from './channelRetain.ts'
 import {
@@ -135,11 +136,13 @@ export function useWorldSync(
   const [raisedGroups, setRaisedGroups] = useState<readonly string[]>([])
   const [yieldNonce, setYieldNonce] = useState(0)
 
+  const { messages } = useI18n()
   const geometryRef = useRef<Geometry | null>(null)
   const setupRef = useRef(setup)
   const liveRef = useRef<LiveState | null>(null)
   const peersRef = useRef(peers)
   const playerRef = useRef(player)
+  const fallbackNameRef = useRef(messages.player.fallback)
 
   const puzzleKey = built?.key ?? ''
   if ((world?.key ?? '') !== puzzleKey) {
@@ -165,6 +168,7 @@ export function useWorldSync(
     setupRef.current = setup
     peersRef.current = peers
     playerRef.current = player
+    fallbackNameRef.current = messages.player.fallback
     liveRef.current = world
     geometryRef.current =
       built && world
@@ -176,7 +180,7 @@ export function useWorldSync(
             template: built.template,
           }
         : null
-  }, [setup, peers, player, world, built])
+  }, [setup, peers, player, world, built, messages.player.fallback])
 
   useEffect(() => {
     const channel = retainPuzzleChannel(sessionId)
@@ -538,7 +542,7 @@ export function useWorldSync(
         if (!point) continue
         nextCursors.push({
           id,
-          name: names.get(id) ?? 'Player',
+          name: names.get(id) ?? fallbackNameRef.current,
           color: cursorColor(id),
           x: point.x,
           y: point.y,

@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
 import { PuzzleBoard } from '../components/PuzzleBoard.tsx'
+import { localizeError } from '../i18n/errors.ts'
+import { useI18n } from '../i18n/useI18n.ts'
+import type { Messages } from '../i18n/types.ts'
 import {
   clearConfirmedPlayerName,
   normalizePlayerName,
@@ -16,15 +19,14 @@ import { usePuzzleSession } from '../puzzle/usePuzzleSession.ts'
 import { useWorldSync } from '../puzzle/useWorldSync.ts'
 
 export function PlayPage() {
+  const { messages } = useI18n()
   const { sessionId: rawId } = useParams()
   const sessionId = rawId ? normalizeSessionId(rawId) : null
   if (!sessionId) {
     return (
       <main className="page">
-        <h1>Unknown session</h1>
-        <p className="lede">
-          This invite link does not point at a puzzle session.
-        </p>
+        <h1>{messages.play.unknownTitle}</h1>
+        <p className="lede">{messages.play.unknownLede}</p>
       </main>
     )
   }
@@ -32,6 +34,7 @@ export function PlayPage() {
 }
 
 function PlayEntry({ sessionId }: { sessionId: string }) {
+  const { messages } = useI18n()
   const [routedName] = useState(peekConfirmedPlayerName)
   const [playerName, setPlayerName] = useState(
     () => routedName ?? readPlayerName(),
@@ -49,10 +52,8 @@ function PlayEntry({ sessionId }: { sessionId: string }) {
     const name = normalizePlayerName(playerName)
     return (
       <main className="page">
-        <h1>Join puzzle</h1>
-        <p className="lede">
-          Choose the name other players will see before entering this session.
-        </p>
+        <h1>{messages.play.joinTitle}</h1>
+        <p className="lede">{messages.play.joinLede}</p>
         <form
           className="setup"
           onSubmit={(event) => {
@@ -69,7 +70,7 @@ function PlayEntry({ sessionId }: { sessionId: string }) {
             autoFocus
           />
           <button type="submit" className="button" disabled={name === null}>
-            Join
+            {messages.play.join}
           </button>
         </form>
       </main>
@@ -82,10 +83,11 @@ function PlayEntry({ sessionId }: { sessionId: string }) {
 function playerLabel(
   player: { id: string; name: string; self: boolean },
   masterId: string | null,
+  text: Messages['player'],
 ): string {
   const tags: string[] = []
-  if (player.self) tags.push('you')
-  if (player.id === masterId) tags.push('host')
+  if (player.self) tags.push(text.you)
+  if (player.id === masterId) tags.push(text.host)
   if (tags.length === 0) return player.name
   return `${player.name} (${tags.join(', ')})`
 }
@@ -97,6 +99,8 @@ function PlaySession({
   sessionId: string
   playerName: string
 }) {
+  const { messages } = useI18n()
+  const text = messages.play
   const [playerId] = useState(readPlayerId)
   const { setup, phase, channelError, channelName, source, players } =
     usePuzzleSession(sessionId, { id: playerId, name: playerName })
@@ -155,34 +159,29 @@ function PlaySession({
   return (
     <>
       <main className="page page--wide" hidden={playing}>
-        <h1>Puzzle session</h1>
+        <h1>{text.sessionTitle}</h1>
         <p className="lede">
           {source === 'peer'
-            ? 'Setup arrived from a connected player and is saved in this browser.'
+            ? text.sourcePeer
             : source === 'local'
-              ? 'Setup is saved in this browser. Connected players can request it.'
-              : 'Waiting for a connected player who already has this session.'}
+              ? text.sourceLocal
+              : text.sourceWaiting}
         </p>
-        <section className="players-block" aria-label="Players">
-          <h2>Players</h2>
+        <section className="players-block" aria-label={text.players}>
+          <h2>{text.players}</h2>
           <ul className="players">
             {players.map((player) => (
-              <li key={player.id}>{playerLabel(player, world.masterId)}</li>
+              <li key={player.id}>
+                {playerLabel(player, world.masterId, messages.player)}
+              </li>
             ))}
           </ul>
-          <p className="muted">
-            Piece positions are saved in this browser. Closing the tab, or
-            losing the connection, does not reset the puzzle. The host breaks
-            ties when two players commit the same piece at once. A newer move
-            still replaces an older one.
-          </p>
-          {others.length === 0 && (
-            <p className="muted">Waiting for other players to join.</p>
-          )}
+          <p className="muted">{text.persistence}</p>
+          {others.length === 0 && <p className="muted">{text.waitingOthers}</p>}
         </section>
         <section className="invite">
           <label className="field">
-            <span>Invite link</span>
+            <span>{text.invite}</span>
             <input
               readOnly
               value={inviteUrl}
@@ -194,7 +193,7 @@ function PlaySession({
             className="button"
             onClick={() => void copyInvite()}
           >
-            {copied ? 'Copied' : 'Copy invite'}
+            {copied ? text.copied : text.copyInvite}
           </button>
           <button
             ref={playRef}
@@ -203,43 +202,43 @@ function PlaySession({
             disabled={!setup}
             onClick={enterPlay}
           >
-            Play
+            {text.play}
           </button>
         </section>
         <dl className="facts">
           <div>
-            <dt>Channel</dt>
+            <dt>{text.channel}</dt>
             <dd>
               <code>{channelName}</code>
             </dd>
           </div>
           <div>
-            <dt>Channel status</dt>
+            <dt>{text.channelStatus}</dt>
             <dd>
               {phase === 'live'
-                ? 'Joined'
+                ? text.joined
                 : phase === 'error'
-                  ? 'Failed'
-                  : 'Joining…'}
+                  ? text.failed
+                  : text.joining}
             </dd>
           </div>
           {setup && (
             <>
               <div>
-                <dt>Image</dt>
+                <dt>{text.image}</dt>
                 <dd>
                   {setup.imageWidth} × {setup.imageHeight}
                 </dd>
               </div>
               <div>
-                <dt>Pieces</dt>
+                <dt>{text.pieces}</dt>
                 <dd>
                   {grid ? grid.cols * grid.rows : setup.pieceCount}
                   {grid ? ` · ${grid.cols} × ${grid.rows}` : ''}
                 </dd>
               </div>
               <div>
-                <dt>Seed</dt>
+                <dt>{text.seed}</dt>
                 <dd>{setup.seed}</dd>
               </div>
             </>
@@ -247,12 +246,12 @@ function PlaySession({
         </dl>
         {channelError && (
           <p className="banner banner--error" role="alert">
-            {channelError}
+            {localizeError(channelError, messages.errors)}
           </p>
         )}
         {!setup && phase !== 'error' && (
           <p className="muted" role="status">
-            Asking connected players for the image, size, piece count, and seed.
+            {text.asking}
           </p>
         )}
       </main>

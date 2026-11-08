@@ -7,6 +7,9 @@ import {
   type ApinatorSnapshot,
 } from '../apinator.ts'
 import { connectionLabel, connectionTone } from '../connectionStatus.ts'
+import { localizeError } from '../i18n/errors.ts'
+import type { Messages } from '../i18n/types.ts'
+import { useI18n } from '../i18n/useI18n.ts'
 
 function formatData(data: unknown): string {
   if (typeof data === 'string') return data
@@ -17,69 +20,71 @@ function formatData(data: unknown): string {
   }
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleTimeString()
+  return date.toLocaleTimeString(locale)
 }
 
-function subscriptionLabel(status: ApinatorSnapshot): string {
-  if (status.subscription === 'error') return 'Failed'
+function subscriptionLabel(
+  status: ApinatorSnapshot,
+  text: Messages['home'],
+): string {
+  if (status.subscription === 'error') return text.failed
   if (status.subscription === 'subscribed' && status.state === 'connected') {
-    return 'Subscribed'
+    return text.subscribed
   }
-  if (status.state === 'connected') return 'Subscribing'
-  return 'Waiting for connection'
+  if (status.state === 'connected') return text.subscribing
+  return text.waiting
 }
 
 export function HomePage({ status }: { status: ApinatorSnapshot }) {
+  const { locale, messages } = useI18n()
+  const text = messages.home
   const tone = connectionTone(status.state)
   return (
     <main className="page">
-      <h1>Jigsaw</h1>
-      <p className="lede">
-        Placeholder home for jigsaw-gg.github.io. Navigation and the theme
-        switch are wired up; puzzle browsing comes later.
-      </p>
+      <h1>{text.title}</h1>
+      <p className="lede">{text.lede}</p>
 
       <section className="status-card" aria-live="polite">
         <div className="status-card__header">
           <h2>Apinator</h2>
           <span className={`badge badge--${tone}`}>
-            {connectionLabel(status.state)}
+            {connectionLabel(status.state, messages.connection)}
           </span>
         </div>
         <dl className="facts">
           <div>
-            <dt>Cluster</dt>
+            <dt>{text.cluster}</dt>
             <dd>{APINATOR_CLUSTER}</dd>
           </div>
           <div>
-            <dt>Channel</dt>
+            <dt>{text.channel}</dt>
             <dd>
               <code>{APINATOR_CHANNEL}</code>
             </dd>
           </div>
           <div>
-            <dt>Event</dt>
+            <dt>{text.event}</dt>
             <dd>
               <code>{APINATOR_EVENT}</code>
             </dd>
           </div>
           <div>
-            <dt>Subscription</dt>
-            <dd>{subscriptionLabel(status)}</dd>
+            <dt>{text.subscription}</dt>
+            <dd>{subscriptionLabel(status, text)}</dd>
           </div>
           <div>
-            <dt>Socket</dt>
+            <dt>{text.socket}</dt>
             <dd>{status.socketId ?? '—'}</dd>
           </div>
           <div>
-            <dt>App key</dt>
+            <dt>{text.appKey}</dt>
             <dd>
               <code>
                 {APINATOR_APP_KEY ||
-                  (APINATOR_MOCK ? 'Development mock' : 'Not configured')}
+                  (APINATOR_MOCK ? text.mock : text.notConfigured)}
               </code>
             </dd>
           </div>
@@ -87,18 +92,20 @@ export function HomePage({ status }: { status: ApinatorSnapshot }) {
 
         {status.error && (
           <div className="banner banner--error" role="alert">
-            <p>{status.error}</p>
+            <p>{localizeError(status.error, messages.errors)}</p>
           </div>
         )}
 
-        <h3 className="status-card__subtitle">Recent my-event messages</h3>
+        <h3 className="status-card__subtitle">{text.recent}</h3>
         {status.events.length === 0 ? (
-          <p className="muted">No messages yet.</p>
+          <p className="muted">{text.empty}</p>
         ) : (
           <ul className="event-list">
             {status.events.map((event) => (
               <li key={event.id}>
-                <p className="event-list__time">{formatTime(event.at)}</p>
+                <p className="event-list__time">
+                  {formatTime(event.at, locale)}
+                </p>
                 <pre className="payload">{formatData(event.data)}</pre>
               </li>
             ))}

@@ -6,7 +6,9 @@ import {
   Routes,
 } from 'react-router-dom'
 import { ConnectionPill } from './components/ConnectionPill.tsx'
+import { LanguageSwitcher } from './components/LanguageSwitcher.tsx'
 import { ThemeSwitcher } from './components/ThemeSwitcher.tsx'
+import { useI18n } from './i18n/useI18n.ts'
 import { AboutPage } from './pages/AboutPage.tsx'
 import { HomePage } from './pages/HomePage.tsx'
 import { PlayPage } from './pages/PlayPage.tsx'
@@ -16,6 +18,7 @@ import './App.css'
 
 export default function App() {
   const status = useApinatorStatus()
+  const { messages } = useI18n()
 
   return (
     <BrowserRouter>
@@ -26,13 +29,14 @@ export default function App() {
           </NavLink>
           <div className="topbar__actions">
             <ConnectionPill state={status.state} />
+            <LanguageSwitcher />
             <ThemeSwitcher />
-            <nav className="topbar__nav" aria-label="Primary">
+            <nav className="topbar__nav" aria-label={messages.nav.primary}>
               <NavLink to="/" end>
-                Home
+                {messages.nav.home}
               </NavLink>
-              <NavLink to="/puzzles">Puzzles</NavLink>
-              <NavLink to="/about">About</NavLink>
+              <NavLink to="/puzzles">{messages.nav.puzzles}</NavLink>
+              <NavLink to="/about">{messages.nav.about}</NavLink>
             </nav>
           </div>
         </header>

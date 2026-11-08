@@ -1,0 +1,109 @@
+export interface Messages {
+  nav: {
+    primary: string
+    home: string
+    puzzles: string
+    about: string
+  }
+  language: {
+    button: string
+    title: string
+    close: string
+  }
+  theme: {
+    group: string
+    system: string
+    light: string
+    dark: string
+  }
+  connection: {
+    starting: string
+    connecting: string
+    connected: string
+    disconnected: string
+    unavailable: string
+    pill: (label: string) => string
+  }
+  home: {
+    title: string
+    lede: string
+    cluster: string
+    channel: string
+    event: string
+    subscription: string
+    socket: string
+    appKey: string
+    failed: string
+    subscribed: string
+    subscribing: string
+    waiting: string
+    mock: string
+    notConfigured: string
+    recent: string
+    empty: string
+  }
+  about: {
+    title: string
+    lede: string
+  }
+  puzzles: {
+    title: string
+    lede: string
+    imageUrl: string
+    gallery: string
+    galleryImage: (index: number) => string
+    pieces: string
+    imageSize: string
+    unavailable: string
+    loading: string
+    arrangement: string
+    pieceCount: (count: number) => string
+    seed: string
+    start: string
+    imageError: string
+  }
+  player: {
+    name: string
+    hint: string
+    you: string
+    host: string
+    fallback: string
+  }
+  play: {
+    unknownTitle: string
+    unknownLede: string
+    joinTitle: string
+    joinLede: string
+    join: string
+    sessionTitle: string
+    sourcePeer: string
+    sourceLocal: string
+    sourceWaiting: string
+    players: string
+    persistence: string
+    waitingOthers: string
+    invite: string
+    copied: string
+    copyInvite: string
+    play: string
+    channel: string
+    channelStatus: string
+    joined: string
+    failed: string
+    joining: string
+    image: string
+    pieces: string
+    seed: string
+    asking: string
+    playArea: string
+    imageError: string
+    back: string
+    piece: (row: number, col: number) => string
+    pointer: (name: string) => string
+  }
+  errors: {
+    appKeyMissing: string
+    connection: string
+    channelJoin: string
+  }
+}

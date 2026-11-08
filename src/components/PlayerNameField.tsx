@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/useI18n.ts'
 import { MAX_PLAYER_NAME_LENGTH } from '../playerName.ts'
 
 export function PlayerNameField({
@@ -9,9 +10,10 @@ export function PlayerNameField({
   onChange: (value: string) => void
   autoFocus?: boolean
 }) {
+  const { messages } = useI18n()
   return (
     <label className="field">
-      <span>Your name</span>
+      <span>{messages.player.name}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -20,10 +22,7 @@ export function PlayerNameField({
         maxLength={MAX_PLAYER_NAME_LENGTH}
         spellCheck={false}
       />
-      <p className="field__hint">
-        Other players in the session will see this name. It is saved in this
-        browser and filled in next time.
-      </p>
+      <p className="field__hint">{messages.player.hint}</p>
     </label>
   )
 }

@@ -8,17 +8,28 @@ export function connectionTone(state: ConnectionState): ConnectionTone {
   return 'wait'
 }
 
-export function connectionLabel(state: ConnectionState): string {
+export interface ConnectionLabels {
+  starting: string
+  connecting: string
+  connected: string
+  disconnected: string
+  unavailable: string
+}
+
+export function connectionLabel(
+  state: ConnectionState,
+  labels: ConnectionLabels,
+): string {
   switch (state) {
     case 'initialized':
-      return 'Starting'
+      return labels.starting
     case 'connecting':
-      return 'Connecting'
+      return labels.connecting
     case 'connected':
-      return 'Connected'
+      return labels.connected
     case 'disconnected':
-      return 'Disconnected'
+      return labels.disconnected
     case 'unavailable':
-      return 'Unavailable'
+      return labels.unavailable
   }
 }
