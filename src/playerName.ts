@@ -34,6 +34,78 @@ export function readPlayerName(): string {
   }
 }
 
+const NICKNAME_ADJECTIVES = [
+  'picky',
+  'breezy',
+  'sleepy',
+  'wiggly',
+  'sparkly',
+  'mellow',
+  'zippy',
+  'clumsy',
+  'cozy',
+  'nifty',
+  'jumpy',
+  'sneaky',
+  'rosy',
+  'crispy',
+  'bouncy',
+  'dizzy',
+  'fuzzy',
+  'jaunty',
+  'lucky',
+  'merry',
+  'peppy',
+  'quirky',
+  'sunny',
+  'tidy',
+  'wobbly',
+  'zesty',
+  'cheeky',
+  'jolly',
+  'gentle',
+]
+
+const NICKNAME_NOUNS = [
+  'cucumber',
+  'panda',
+  'kettle',
+  'muffin',
+  'pebble',
+  'turnip',
+  'waffle',
+  'badger',
+  'comet',
+  'donut',
+  'fern',
+  'goose',
+  'hedgehog',
+  'igloo',
+  'jelly',
+  'kiwi',
+  'lantern',
+  'noodle',
+  'otter',
+  'pickle',
+  'quokka',
+  'radish',
+  'sprout',
+  'teacup',
+  'walnut',
+  'yacht',
+  'zebra',
+  'biscuit',
+  'cactus',
+]
+
+/** A fresh adjective-noun name for someone who has not chosen one yet. */
+export function suggestPlayerName(): string {
+  const adjective =
+    NICKNAME_ADJECTIVES[Math.floor(Math.random() * NICKNAME_ADJECTIVES.length)]
+  const noun = NICKNAME_NOUNS[Math.floor(Math.random() * NICKNAME_NOUNS.length)]
+  return `${adjective}-${noun}`
+}
+
 export function writePlayerName(name: string): void {
   const normalized = normalizePlayerName(name)
   if (!normalized) return

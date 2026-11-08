@@ -11,6 +11,7 @@ import {
   peekConfirmedPlayerName,
   readPlayerId,
   readPlayerName,
+  suggestPlayerName,
   writePlayerName,
 } from '../playerName.ts'
 import { fullscreenElement, isImmersive, setImmersive } from '../fullscreen.ts'
@@ -38,7 +39,7 @@ function PlayEntry({ sessionId }: { sessionId: string }) {
   const { messages } = useI18n()
   const [routedName] = useState(peekConfirmedPlayerName)
   const [playerName, setPlayerName] = useState(
-    () => routedName ?? readPlayerName(),
+    () => routedName ?? (readPlayerName() || suggestPlayerName()),
   )
   const [confirmedName, setConfirmedName] = useState<string | null>(routedName)
 
