@@ -13,6 +13,7 @@ import {
 import { chooseGrid } from '../puzzle/cut.ts'
 import { normalizeSessionId } from '../puzzle/session.ts'
 import { usePuzzleSession } from '../puzzle/usePuzzleSession.ts'
+import { useWorldSync } from '../puzzle/useWorldSync.ts'
 
 export function PlayPage() {
   const { sessionId: rawId } = useParams()
@@ -78,6 +79,17 @@ function PlayEntry({ sessionId }: { sessionId: string }) {
   return <PlaySession sessionId={sessionId} playerName={confirmedName} />
 }
 
+function playerLabel(
+  player: { id: string; name: string; self: boolean },
+  masterId: string | null,
+): string {
+  const tags: string[] = []
+  if (player.self) tags.push('you')
+  if (player.id === masterId) tags.push('host')
+  if (tags.length === 0) return player.name
+  return `${player.name} (${tags.join(', ')})`
+}
+
 function PlaySession({
   sessionId,
   playerName,
@@ -88,6 +100,12 @@ function PlaySession({
   const [playerId] = useState(readPlayerId)
   const { setup, phase, channelError, channelName, source, players } =
     usePuzzleSession(sessionId, { id: playerId, name: playerName })
+  const world = useWorldSync(
+    sessionId,
+    { id: playerId, name: playerName },
+    setup,
+    players,
+  )
   const inviteUrl = `${window.location.origin}/play/${sessionId}`
   const [copied, setCopied] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -149,12 +167,15 @@ function PlaySession({
           <h2>Players</h2>
           <ul className="players">
             {players.map((player) => (
-              <li key={player.id}>
-                {player.name}
-                {player.self ? ' (you)' : ''}
-              </li>
+              <li key={player.id}>{playerLabel(player, world.masterId)}</li>
             ))}
           </ul>
+          <p className="muted">
+            Piece positions are saved in this browser. Closing the tab, or
+            losing the connection, does not reset the puzzle. The host breaks
+            ties when two players commit the same piece at once. A newer move
+            still replaces an older one.
+          </p>
           {others.length === 0 && (
             <p className="muted">Waiting for other players to join.</p>
           )}
@@ -235,8 +256,21 @@ function PlaySession({
           </p>
         )}
       </main>
-      {keepBoard && setup && (
-        <PuzzleBoard setup={setup} active={playing} onLeave={leavePlay} />
+      {keepBoard && setup && world.placements && (
+        <PuzzleBoard
+          setup={setup}
+          active={playing}
+          placements={world.placements}
+          cursors={world.cursors}
+          raisedGroups={world.raisedGroups}
+          yieldNonce={world.yieldNonce}
+          onLeave={leavePlay}
+          onPointer={world.reportPointer}
+          onPointerGone={world.reportPointerGone}
+          onDrag={world.reportDrag}
+          onDragEnd={world.reportDragEnd}
+          onDragCancel={world.reportDragCancel}
+        />
       )}
     </>
   )

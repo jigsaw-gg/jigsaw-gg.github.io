@@ -17,6 +17,7 @@ import {
   type ScatteredBoard,
 } from '../puzzle/play.ts'
 import type { PuzzleSetup } from '../puzzle/session.ts'
+import type { RemoteCursor } from '../puzzle/useWorldSync.ts'
 
 /** Nearby-piece glow fade, in milliseconds. */
 const GLOW_MS = 260
@@ -91,18 +92,45 @@ function useFade(active: boolean): number {
 export function PuzzleBoard({
   setup,
   active,
+  placements,
+  cursors,
+  raisedGroups,
+  yieldNonce,
   onLeave,
+  onPointer,
+  onPointerGone,
+  onDrag,
+  onDragEnd,
+  onDragCancel,
 }: {
   setup: PuzzleSetup
   active: boolean
+  placements: Placement[]
+  cursors: readonly RemoteCursor[]
+  raisedGroups: readonly string[]
+  yieldNonce: number
   onLeave: () => void
+  onPointer: (x: number, y: number) => void
+  onPointerGone: () => void
+  onDrag: (placements: Placement[], anchorId: string) => void
+  onDragEnd: (placements: Placement[]) => void
+  onDragCancel: () => void
 }) {
   return (
     <PuzzleTable
       key={`${setup.seed}:${setup.pieceCount}:${setup.imageWidth}:${setup.imageHeight}`}
       setup={setup}
       active={active}
+      placements={placements}
+      cursors={cursors}
+      raisedGroups={raisedGroups}
+      yieldNonce={yieldNonce}
       onLeave={onLeave}
+      onPointer={onPointer}
+      onPointerGone={onPointerGone}
+      onDrag={onDrag}
+      onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
     />
   )
 }
@@ -110,11 +138,29 @@ export function PuzzleBoard({
 function PuzzleTable({
   setup,
   active,
+  placements: sharedPlacements,
+  cursors,
+  raisedGroups,
+  yieldNonce,
   onLeave,
+  onPointer,
+  onPointerGone,
+  onDrag,
+  onDragEnd,
+  onDragCancel,
 }: {
   setup: PuzzleSetup
   active: boolean
+  placements: Placement[]
+  cursors: readonly RemoteCursor[]
+  raisedGroups: readonly string[]
+  yieldNonce: number
   onLeave: () => void
+  onPointer: (x: number, y: number) => void
+  onPointerGone: () => void
+  onDrag: (placements: Placement[], anchorId: string) => void
+  onDragEnd: (placements: Placement[]) => void
+  onDragCancel: () => void
 }) {
   const model = useMemo(() => buildPuzzle(setup), [setup])
   const layout = useMemo(
@@ -123,7 +169,7 @@ function PuzzleTable({
   )
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [failed, setFailed] = useState(false)
-  const [placements, setPlacements] = useState(layout.placements)
+  const [placements, setPlacements] = useState(sharedPlacements)
   const [near, setNear] = useState<NearPair | null>(null)
   const [frontGroup, setFrontGroup] = useState<string | null>(null)
   const [dragGroup, setDragGroup] = useState<string | null>(null)
@@ -145,7 +191,9 @@ function PuzzleTable({
   const [view, setView] = useState<Camera>(() =>
     fitCamera(window.innerWidth, window.innerHeight, opening, 0),
   )
-  const placementsRef = useRef(layout.placements)
+  const placementsRef = useRef(sharedPlacements)
+  const yieldSeen = useRef(yieldNonce)
+  const publishPointerRef = useRef<(x: number, y: number) => void>(() => {})
   const viewRef = useRef(view)
   const dragRef = useRef<Drag | null>(null)
   const panRef = useRef<Pan | null>(null)
@@ -194,6 +242,43 @@ function PuzzleTable({
   }, [opening])
 
   useEffect(() => {
+    const yielded = yieldNonce !== yieldSeen.current
+    yieldSeen.current = yieldNonce
+    const shared = sharedPlacements
+    if (yielded) {
+      dragRef.current = null
+      setDragGroup(null)
+      setNear(null)
+      offsetsRef.current.clear()
+      setOffsets(new Map())
+      placementsRef.current = shared
+      setPlacements(shared)
+      onDragCancel()
+      return
+    }
+    const drag = dragRef.current
+    if (!drag) {
+      placementsRef.current = shared
+      setPlacements(shared)
+      return
+    }
+    const local = new Map(
+      placementsRef.current.map((piece) => [piece.id, piece]),
+    )
+    const merged = shared.map((piece) =>
+      drag.memberIds.has(piece.id) ? (local.get(piece.id) ?? piece) : piece,
+    )
+    placementsRef.current = merged
+    setPlacements(merged)
+  }, [sharedPlacements, yieldNonce, onDragCancel])
+
+  useEffect(() => {
+    if (!active) onPointerGone()
+  }, [active, onPointerGone])
+
+  useEffect(() => () => onPointerGone(), [onPointerGone])
+
+  useEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) return
     const onWheel = (event: WheelEvent) => {
@@ -221,6 +306,7 @@ function PuzzleTable({
       userAdjustedRef.current = true
       viewRef.current = next
       setView(next)
+      publishPointerRef.current(event.clientX, event.clientY)
     }
     viewport.addEventListener('wheel', onWheel, { passive: false })
     return () => viewport.removeEventListener('wheel', onWheel)
@@ -247,10 +333,41 @@ function PuzzleTable({
     }
   }
 
-  function endDrag() {
+  function publishPointer(clientX: number, clientY: number) {
+    if (!active) return
+    const point = playPoint({ clientX, clientY })
+    if (!point) return
+    onPointer(point.x, point.y)
+  }
+
+  useEffect(() => {
+    publishPointerRef.current = publishPointer
+  })
+
+  function finishDrag(commit: boolean) {
+    if (!dragRef.current) return
     dragRef.current = null
     setDragGroup(null)
     setNear(null)
+    if (commit) onDragEnd(placementsRef.current)
+    else onDragCancel()
+  }
+
+  useEffect(() => {
+    const onPageHide = () => {
+      if (!dragRef.current) return
+      finishDrag(true)
+    }
+    window.addEventListener('pagehide', onPageHide)
+    return () => window.removeEventListener('pagehide', onPageHide)
+  })
+
+  function rememberMembers(drag: Drag) {
+    drag.memberIds = new Set(
+      placementsRef.current
+        .filter((piece) => piece.group === drag.group)
+        .map((piece) => piece.id),
+    )
   }
 
   function beginSlide() {
@@ -327,6 +444,7 @@ function PuzzleTable({
     if (event.buttons === 0) {
       panRef.current = null
       setPanning(false)
+      publishPointer(event.clientX, event.clientY)
       return
     }
     const current = viewRef.current
@@ -339,6 +457,15 @@ function PuzzleTable({
     pan.x = event.clientX
     pan.y = event.clientY
     commitView(next)
+    publishPointer(event.clientX, event.clientY)
+  }
+
+  function onViewportPointerMoveCapture(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    onViewportPointerMove(event)
+    if (panRef.current?.pointerId === event.pointerId) return
+    publishPointer(event.clientX, event.clientY)
   }
 
   function onPointerDown(
@@ -352,22 +479,29 @@ function PuzzleTable({
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
+    const memberIds = new Set(
+      placementsRef.current
+        .filter((piece) => piece.group === placement.group)
+        .map((piece) => piece.id),
+    )
     dragRef.current = {
       pointerId: event.pointerId,
       id,
       group: placement.group,
       grabX: point.x - placement.x,
       grabY: point.y - placement.y,
+      memberIds,
     }
     setFrontGroup(placement.group)
     setDragGroup(placement.group)
+    onDrag(placementsRef.current, placement.id)
   }
 
   function onPointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
     const drag = dragRef.current
     if (!drag || event.pointerId !== drag.pointerId) return
     if (event.buttons === 0) {
-      endDrag()
+      finishDrag(true)
       return
     }
     const point = playPoint(event)
@@ -428,16 +562,18 @@ function PuzzleTable({
     }
     if (result.snapped && anchor) drag.group = anchor.group
     placementsRef.current = placements
+    rememberMembers(drag)
     setPlacements(placements)
     setNear(result.near)
     setFrontGroup(drag.group)
     if (result.snapped) launchSnap(moved, placements)
+    onDrag(placements, drag.id)
   }
 
   function onPointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
     const drag = dragRef.current
     if (!drag || event.pointerId !== drag.pointerId) return
-    endDrag()
+    finishDrag(true)
   }
 
   const viewportClass = panning
@@ -453,9 +589,10 @@ function PuzzleTable({
         aria-label="Play area"
         data-zoom={view.zoom}
         onPointerDown={onViewportPointerDown}
-        onPointerMove={onViewportPointerMove}
+        onPointerMoveCapture={onViewportPointerMoveCapture}
         onPointerUp={endPan}
         onPointerCancel={endPan}
+        onPointerLeave={() => onPointerGone()}
         onAuxClick={(event) => event.preventDefault()}
       >
         {failed ? (
@@ -510,7 +647,10 @@ function PuzzleTable({
                   }
                   offsetX={slide?.x ?? 0}
                   offsetY={slide?.y ?? 0}
-                  raised={placement.group === frontGroup}
+                  raised={
+                    placement.group === frontGroup ||
+                    raisedGroups.includes(placement.group)
+                  }
                   dragging={placement.group === dragGroup}
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
@@ -518,6 +658,9 @@ function PuzzleTable({
                 />
               )
             })}
+            {cursors.map((cursor) => (
+              <RemotePointer key={cursor.id} cursor={cursor} zoom={view.zoom} />
+            ))}
           </div>
         )}
         <button
@@ -611,12 +754,55 @@ function PieceCanvas({
   )
 }
 
+function RemotePointer({
+  cursor,
+  zoom,
+}: {
+  cursor: RemoteCursor
+  zoom: number
+}) {
+  const scale = zoom > 0 ? 1 / zoom : 1
+  return (
+    <div
+      className="remote-cursor"
+      role="img"
+      aria-label={`${cursor.name}'s pointer`}
+      style={{
+        left: cursor.x,
+        top: cursor.y,
+        color: cursor.color,
+        transform: `scale(${scale})`,
+      }}
+    >
+      <svg
+        className="remote-cursor__arrow"
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        aria-hidden="true"
+      >
+        <path
+          d="M1 1 L1 14.2 L4.7 10.6 L8.4 16.2 L10.6 15 L6.9 9.4 L11.6 9 Z"
+          fill="currentColor"
+          stroke="#fff"
+          strokeWidth="1"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="remote-cursor__name">
+        <span>{cursor.name}</span>
+      </span>
+    </div>
+  )
+}
+
 interface Drag {
   pointerId: number
   id: string
   group: string
   grabX: number
   grabY: number
+  memberIds: Set<string>
 }
 
 interface Pan {

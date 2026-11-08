@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { apinator, type RealtimeChannel } from '../apinator.ts'
+import { releasePuzzleChannel, retainPuzzleChannel } from './channelRetain.ts'
 import { normalizePlayerName } from '../playerName.ts'
 import {
   parseSetup,
@@ -64,8 +65,8 @@ export function usePuzzleSession(
       return () => window.clearTimeout(frame)
     }
 
-    const channelName = puzzleChannelName(sessionId)
-    const channel = client.subscribe(channelName)
+    const channel = retainPuzzleChannel(sessionId)
+    if (!channel) return
     const knownPeers = new Map<string, PeerRecord>()
     let timer = 0
 
@@ -174,7 +175,7 @@ export function usePuzzleSession(
       channel.unbind(ANNOUNCE_EVENT, onAnnounce)
       channel.unbind('realtime:subscription_succeeded', onReady)
       channel.unbind('realtime:subscription_error', onError)
-      client.unsubscribe(channelName)
+      releasePuzzleChannel(sessionId)
       setPeers([])
     }
   }, [sessionId, player.id, player.name])
