@@ -52,6 +52,7 @@ export const es: Messages = {
     title: 'Nuevo puzle',
     lede: 'Elige una imagen y cuántas piezas cortar. Elige el nombre que verán los demás jugadores. La semilla se elige aquí. Empezar abre una sesión privada y un enlace de invitación.',
     imageUrl: 'URL de la imagen',
+    imagePreview: 'Vista previa de la imagen del puzle',
     gallery: 'Elegir de la galería',
     galleryImage: (index) => `Imagen de la galería ${index}`,
     pieces: 'Piezas',

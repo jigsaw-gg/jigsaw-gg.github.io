@@ -50,6 +50,7 @@ export interface Messages {
     title: string
     lede: string
     imageUrl: string
+    imagePreview: string
     gallery: string
     galleryImage: (index: number) => string
     pieces: string

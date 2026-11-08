@@ -52,6 +52,7 @@ export const en: Messages = {
     title: 'New puzzle',
     lede: 'Pick an image and how many pieces to cut. Choose the name other players will see. The seed is chosen here. Start opens a private session and an invite link.',
     imageUrl: 'Image URL',
+    imagePreview: 'Puzzle image preview',
     gallery: 'Pick from gallery',
     galleryImage: (index) => `Gallery image ${index}`,
     pieces: 'Pieces',
