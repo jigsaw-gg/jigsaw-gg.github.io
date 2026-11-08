@@ -38,12 +38,33 @@ export function PlayPage() {
 }
 
 function PlayEntry({ sessionId }: { sessionId: string }) {
-  const { messages } = useI18n()
+  const { locale, messages } = useI18n()
   const [routedName] = useState(peekConfirmedPlayerName)
-  const [playerName, setPlayerName] = useState(
-    () => routedName ?? (readPlayerName() || suggestPlayerName()),
-  )
+  const [nameDraft, setNameDraft] = useState(() => {
+    const preset = routedName || readPlayerName()
+    if (preset) return { locale, name: preset, suggested: false }
+    return { locale, name: suggestPlayerName(locale), suggested: true }
+  })
   const [confirmedName, setConfirmedName] = useState<string | null>(routedName)
+  if (
+    nameDraft.suggested &&
+    confirmedName === null &&
+    nameDraft.locale !== locale
+  ) {
+    setNameDraft({
+      locale,
+      name: suggestPlayerName(locale),
+      suggested: true,
+    })
+  }
+  const playerName = nameDraft.name
+  function setPlayerName(name: string) {
+    setNameDraft((current) => ({
+      locale,
+      name,
+      suggested: current.suggested && name === current.name,
+    }))
+  }
 
   useEffect(() => {
     if (!routedName) return

@@ -663,6 +663,46 @@ html:has(.embedded-safari) .play-mode {
   padding: 0.55rem 0.7rem;
 }
 
+.field .field__control {
+  position: relative;
+  display: block;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+}
+
+.field__control input {
+  padding-right: 5.4rem;
+}
+
+.field__random {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+}
+
+.field__random:hover {
+  color: var(--accent);
+}
+
+.field__random:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .field input:focus-visible,
 .button:focus-visible {
   outline: 2px solid var(--accent);
