@@ -103,20 +103,25 @@ export function buildPuzzle(setup: PuzzleSetup): PuzzleModel {
               straight(x + cellW, y, x + cellW, y + cellH)),
         false,
       )
+      const bottomIsOuter = row === rows - 1
       append(
         points,
-        row === rows - 1
+        bottomIsOuter
           ? straight(x + cellW, y + cellH, x, y + cellH)
           : (horizontal.get(edgeKey(col, row + 1)) ??
-              straight(x + cellW, y + cellH, x, y + cellH)),
-        true,
+              straight(x, y + cellH, x + cellW, y + cellH)),
+        // Stored cuts run left to right; the piece walks the bottom right to left.
+        // The outer edge is already in that direction.
+        !bottomIsOuter,
       )
+      const leftIsOuter = col === 0
       append(
         points,
-        col === 0
+        leftIsOuter
           ? straight(x, y + cellH, x, y)
-          : (vertical.get(edgeKey(col, row)) ?? straight(x, y + cellH, x, y)),
-        true,
+          : (vertical.get(edgeKey(col, row)) ?? straight(x, y, x, y + cellH)),
+        // Stored cuts run top to bottom; the piece walks the left side upward.
+        !leftIsOuter,
       )
       pieces.push({ col, row, points })
     }
