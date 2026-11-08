@@ -452,8 +452,14 @@
 }
 
 .play-field {
-  background: var(--board);
+  background-color: var(--board);
+  background-image: url('./assets/neural-table-light.svg');
+  background-repeat: repeat;
   outline: 10px solid var(--board-edge);
+}
+
+:root[data-theme='dark'] .play-field {
+  background-image: url('./assets/neural-table-dark.svg');
 }
 
 .play-mode__leave {

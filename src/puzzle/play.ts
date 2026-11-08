@@ -108,12 +108,16 @@ export function approachLimits(
   }
 }
 
-/** Twice as wide and twice as tall as the piece table: four times the space. */
-const PLAY_AREA_SPAN = 2
+/** Minimum table size relative to the scattered piece field, on each axis. */
+const TABLE_MIN_SPAN = 2
+const TABLE_RATIO = 16 / 9
 
 export function playArea(playW: number, playH: number): Bounds {
-  const width = playW * PLAY_AREA_SPAN
-  const height = playH * PLAY_AREA_SPAN
+  const neededW = Math.max(1, playW) * TABLE_MIN_SPAN
+  const neededH = Math.max(1, playH) * TABLE_MIN_SPAN
+  const width =
+    neededW / neededH > TABLE_RATIO ? neededW : neededH * TABLE_RATIO
+  const height = width / TABLE_RATIO
   const minX = (playW - width) / 2
   const minY = (playH - height) / 2
   return { minX, minY, maxX: minX + width, maxY: minY + height }

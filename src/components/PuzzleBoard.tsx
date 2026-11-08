@@ -6,6 +6,7 @@ import {
   clampGroup,
   fitCamera,
   moveGroup,
+  pieceBounds,
   playArea,
   pullToNeighbors,
   scatterPieces,
@@ -136,12 +137,13 @@ function PuzzleTable({
     () => playArea(layout.playW, layout.playH),
     [layout.playW, layout.playH],
   )
+  const opening = useMemo(
+    () =>
+      pieceBounds(layout.placements, layout.cellW, layout.cellH, layout.pad),
+    [layout],
+  )
   const [view, setView] = useState<Camera>(() =>
-    fitCamera(
-      window.innerWidth,
-      window.innerHeight,
-      playArea(layout.playW, layout.playH),
-    ),
+    fitCamera(window.innerWidth, window.innerHeight, opening, 0),
   )
   const placementsRef = useRef(layout.placements)
   const viewRef = useRef(view)
@@ -182,14 +184,14 @@ function PuzzleTable({
       if (userAdjustedRef.current) return
       const rect = viewport.getBoundingClientRect()
       if (rect.width < 2 || rect.height < 2) return
-      const next = fitCamera(rect.width, rect.height, area)
+      const next = fitCamera(rect.width, rect.height, opening, 0)
       viewRef.current = next
       setView(next)
     }
     const observer = new ResizeObserver(fit)
     observer.observe(viewport)
     return () => observer.disconnect()
-  }, [area])
+  }, [opening])
 
   useEffect(() => {
     const viewport = viewportRef.current
