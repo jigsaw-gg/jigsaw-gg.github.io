@@ -1,12 +1,11 @@
+import { useI18n } from '../i18n/useI18n.ts'
+
 export function AboutPage() {
+  const { messages } = useI18n()
   return (
     <main className="page">
-      <h1>About</h1>
-      <p className="lede">
-        Dummy about page. This site will live at jigsaw-gg.github.io. The header
-        switches between system, light, and dark, and the home page shows the
-        Apinator connection.
-      </p>
+      <h1>{messages.about.title}</h1>
+      <p className="lede">{messages.about.lede}</p>
     </main>
   )
 }

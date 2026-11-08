@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from '../i18n/useI18n.ts'
 import {
   applyResolvedTheme,
   readThemePreference,
@@ -7,13 +8,13 @@ import {
   writeThemePreference,
 } from '../theme.ts'
 
-const OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-]
-
 export function ThemeSwitcher() {
+  const { messages } = useI18n()
+  const options: { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: messages.theme.system },
+    { value: 'light', label: messages.theme.light },
+    { value: 'dark', label: messages.theme.dark },
+  ]
   const [preference, setPreference] = useState<ThemePreference>(() =>
     readThemePreference(),
   )
@@ -31,8 +32,12 @@ export function ThemeSwitcher() {
   }, [preference])
 
   return (
-    <div className="theme-switcher" role="group" aria-label="Color theme">
-      {OPTIONS.map((option) => (
+    <div
+      className="theme-switcher"
+      role="group"
+      aria-label={messages.theme.group}
+    >
+      {options.map((option) => (
         <button
           key={option.value}
           type="button"

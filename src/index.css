@@ -18,6 +18,10 @@
   --badge-bad-bg: #f8d7da;
   --badge-bad-text: #58151c;
   --theme-switcher-active-bg: #e8edf2;
+  --board: #e4ebf2;
+  --board-edge: #1a1d21;
+  --board-limit: #b7c3cf;
+  --board-limit-stripe: rgba(26, 29, 33, 0.22);
 }
 
 :root[data-theme='dark'] {
@@ -39,6 +43,10 @@
   --badge-bad-bg: #2c1215;
   --badge-bad-text: #f5c2c7;
   --theme-switcher-active-bg: #2a313c;
+  --board: #0e131a;
+  --board-edge: #e8ecf1;
+  --board-limit: #07090d;
+  --board-limit-stripe: rgba(232, 236, 241, 0.14);
 }
 
 :root {

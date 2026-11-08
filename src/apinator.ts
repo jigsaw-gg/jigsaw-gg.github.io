@@ -1,4 +1,6 @@
 import { Apinator, type ConnectionState } from '@apinator/client'
+import { createMockApinator } from './apinatorMock.ts'
+import { i18nError } from './i18n/errors.ts'
 
 function readAppKey(): string {
   const raw = import.meta.env.VITE_APINATOR_APP_KEY
@@ -10,6 +12,24 @@ function readAppKey(): string {
 
 /** Inlined at build time from VITE_APINATOR_APP_KEY. */
 export const APINATOR_APP_KEY = readAppKey()
+/** Local stand-in used by `vite` when no app key is configured. */
+export const APINATOR_MOCK = APINATOR_APP_KEY === '' && import.meta.env.DEV
+
+export interface RealtimeChannel {
+  readonly subscribed: boolean
+  bind(event: string, callback: (data: unknown) => void): void
+  unbind(event: string, callback?: (data: unknown) => void): void
+  trigger(event: string, data: unknown): void
+}
+
+export interface RealtimeClient {
+  readonly state: ConnectionState
+  readonly socketId: string | null
+  connect(): void
+  subscribe(channelName: string): RealtimeChannel
+  unsubscribe(channelName: string): void
+  bind(event: string, callback: (data: unknown) => void): void
+}
 export const APINATOR_CLUSTER = 'eu'
 export const APINATOR_CHANNEL = 'my-channel'
 export const APINATOR_EVENT = 'my-event'
@@ -66,7 +86,7 @@ function errorText(data: unknown): string {
   try {
     return JSON.stringify(data)
   } catch {
-    return 'Connection error'
+    return i18nError('connection')
   }
 }
 
@@ -95,12 +115,17 @@ export function getApinatorStatus(): ApinatorSnapshot {
   return snapshot
 }
 
-function startApinator(appKey: string): void {
-  const client = new Apinator({
-    appKey,
-    cluster: APINATOR_CLUSTER,
-  })
+export const apinator: RealtimeClient | null = APINATOR_APP_KEY
+  ? new Apinator({
+      appKey: APINATOR_APP_KEY,
+      cluster: APINATOR_CLUSTER,
+      authEndpoint: '/api/realtime/auth',
+    })
+  : APINATOR_MOCK
+    ? createMockApinator()
+    : null
 
+function startApinator(client: RealtimeClient): void {
   client.connect()
 
   const channel = client.subscribe(APINATOR_CHANNEL)
@@ -157,14 +182,14 @@ function startApinator(appKey: string): void {
   })
 }
 
-if (APINATOR_APP_KEY) {
-  startApinator(APINATOR_APP_KEY)
+if (apinator) {
+  startApinator(apinator)
 } else {
   snapshot = {
     state: 'unavailable',
     socketId: null,
     subscription: 'error',
     events: [],
-    error: 'App key is not set.',
+    error: i18nError('appKeyMissing'),
   }
 }
