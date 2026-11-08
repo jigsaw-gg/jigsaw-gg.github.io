@@ -12,16 +12,6 @@ repos:
         args: [--fix=lf]
       - id: check-merge-conflict
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
-    hooks:
-      - id: prettier
-        additional_dependencies:
-          - prettier@3.5.3
-        files: \.(ts|tsx|js|jsx|css|scss|html)$
-        exclude: ^(node_modules|dist)/
-        args: [--config, .prettierrc]
-
   - repo: local
     hooks:
       - id: eslint-local
@@ -30,4 +20,14 @@ repos:
         language: system
         types: [file]
         files: \.(ts|tsx)$
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: pretrier-local
+        name: pretrier-local
+        entry: bash -c 'npx lint-staged --all'
+        language: system
+        types: [file]
+        files: \.(ts|tsx|json|css|md|html)$
         pass_filenames: false
