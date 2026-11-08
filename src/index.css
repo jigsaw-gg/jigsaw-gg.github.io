@@ -11,6 +11,9 @@
   --banner-error-border: #f5c2c7;
   --banner-error-bg: #f8d7da;
   --banner-error-text: #58151c;
+  --banner-warning-border: #e6d3a1;
+  --banner-warning-bg: #fff3cd;
+  --banner-warning-text: #7a5b00;
   --badge-live-bg: #d8f3dc;
   --badge-live-text: #1b4332;
   --badge-stale-bg: #fff3cd;
@@ -36,6 +39,9 @@
   --banner-error-border: #842029;
   --banner-error-bg: #2c1215;
   --banner-error-text: #f5c2c7;
+  --banner-warning-border: #8a6d1d;
+  --banner-warning-bg: #4a3b0a;
+  --banner-warning-text: #ffe69c;
   --badge-live-bg: #1b4332;
   --badge-live-text: #d8f3dc;
   --badge-stale-bg: #4a3b0a;

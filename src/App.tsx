@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { EmbeddedSafariWarning } from './components/EmbeddedSafariWarning.tsx'
 import { SiteHeader } from './components/SiteHeader.tsx'
 import { AboutPage } from './pages/AboutPage.tsx'
 import { NetworkStatusPage } from './pages/NetworkStatusPage.tsx'
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
+        <EmbeddedSafariWarning />
       </div>
     </BrowserRouter>
   )

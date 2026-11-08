@@ -12,6 +12,8 @@ export const en: Messages = {
   fullscreen: {
     enter: 'Full screen',
     exit: 'Exit full screen',
+    embeddedSafari:
+      'Open this page in standalone Safari browser for fullscreen support',
   },
   language: {
     button: 'Language',

@@ -21,6 +21,8 @@ export const ru: Messages = {
   fullscreen: {
     enter: 'На весь экран',
     exit: 'Выйти из полноэкранного режима',
+    embeddedSafari:
+      'Откройте эту страницу в отдельном браузере Safari, чтобы включить полноэкранный режим',
   },
   language: {
     button: 'Язык',

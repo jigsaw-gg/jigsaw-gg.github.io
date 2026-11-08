@@ -520,6 +520,32 @@
   color: var(--banner-error-text);
 }
 
+.embedded-safari {
+  position: fixed;
+  z-index: 40;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  padding: 0.75rem max(1rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  border-top: 1px solid var(--banner-warning-border);
+  background: var(--banner-warning-bg);
+  color: var(--banner-warning-text);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+
+html:has(.embedded-safari) .app__main {
+  padding-bottom: var(--embedded-safari-space, 0px);
+}
+
+html:has(.embedded-safari) .play-mode {
+  bottom: var(--embedded-safari-space, 0px);
+}
+
 .status-card {
   border: 1px solid var(--border);
   border-radius: 10px;

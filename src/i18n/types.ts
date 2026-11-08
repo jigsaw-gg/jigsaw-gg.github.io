@@ -10,6 +10,7 @@ export interface Messages {
   fullscreen: {
     enter: string
     exit: string
+    embeddedSafari: string
   }
   language: {
     button: string
