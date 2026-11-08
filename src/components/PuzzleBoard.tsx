@@ -564,9 +564,17 @@ function PuzzleTable({
     placementsRef.current = placements
     rememberMembers(drag)
     setPlacements(placements)
-    setNear(result.near)
     setFrontGroup(drag.group)
-    if (result.snapped) launchSnap(moved, placements)
+    if (result.snapped) {
+      launchSnap(moved, placements)
+      onDrag(placements, drag.id)
+      finishDrag(true)
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+      return
+    }
+    setNear(result.near)
     onDrag(placements, drag.id)
   }
 
