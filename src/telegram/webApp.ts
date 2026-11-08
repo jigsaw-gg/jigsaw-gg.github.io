@@ -1,4 +1,4 @@
-import WebApp from '@twa-dev/sdk'
+import WebAppImport from '@twa-dev/sdk'
 import type { ResolvedTheme } from '../theme.ts'
 import { normalizePlayerName } from '../playerName.ts'
 import {
@@ -6,6 +6,26 @@ import {
   telegramMiniAppShortName,
   telegramMiniAppTitle,
 } from './config.ts'
+
+type TelegramWebApp = typeof WebAppImport
+
+/**
+ * Vite’s CJS interop can nest `@twa-dev/sdk`’s default export (`{ default: WebApp }`),
+ * so `import WebApp from '@twa-dev/sdk'` may be the module namespace in production.
+ * Prefer a value that actually exposes `initData`, then the window object the SDK sets.
+ */
+function resolveTelegramWebApp(imported: TelegramWebApp): TelegramWebApp {
+  if (imported && typeof imported.initData === 'string') return imported
+  const nested = (imported as unknown as { default?: TelegramWebApp }).default
+  if (nested && typeof nested.initData === 'string') return nested
+  const injected = (
+    window as Window & { Telegram?: { WebApp?: TelegramWebApp } }
+  ).Telegram?.WebApp
+  if (injected && typeof injected.initData === 'string') return injected
+  return imported
+}
+
+const WebApp = resolveTelegramWebApp(WebAppImport)
 
 export type TelegramDebugInfo = {
   miniApp: boolean
@@ -238,7 +258,7 @@ export function readTelegramDebugInfo(): TelegramDebugInfo {
     colorScheme: WebApp.colorScheme,
     startParam: WebApp.initDataUnsafe?.start_param ?? null,
     tgWebAppStartParam,
-    initDataLength: WebApp.initData.length,
+    initDataLength: WebApp.initData?.length ?? 0,
     userId: user?.id ?? null,
     username: user?.username ?? null,
     firstName: user?.first_name ?? null,

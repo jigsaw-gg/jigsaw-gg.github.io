@@ -11,8 +11,8 @@ import { lanHttpsOptions } from './dev/devHttps.ts'
 
 /**
  * GitHub Pages serves 404.html for unknown paths with status 404, which
- * drops link previews. play/index.html is a real file, so /play/?id=… is 200
- * and crawlers can read the static invite tags. 404.html still boots /play/<id>.
+ * drops link previews. Real index.html files under /play and /about return 200
+ * (invite OG tags; About in Telegram). 404.html still boots other SPA routes.
  */
 function githubPagesSpaFallback(): Plugin {
   return {
@@ -22,9 +22,11 @@ function githubPagesSpaFallback(): Plugin {
       const outDir = resolve('dist')
       const index = resolve(outDir, 'index.html')
       copyFileSync(index, resolve(outDir, '404.html'))
-      const playDir = resolve(outDir, 'play')
-      mkdirSync(playDir, { recursive: true })
-      copyFileSync(index, resolve(playDir, 'index.html'))
+      for (const dir of ['play', 'about']) {
+        const target = resolve(outDir, dir)
+        mkdirSync(target, { recursive: true })
+        copyFileSync(index, resolve(target, 'index.html'))
+      }
     },
   }
 }

@@ -61,6 +61,6 @@ Web invites stay on GitHub Pages for link previews. The play page also shows a c
 
 ## GitHub Pages
 
-`base` in `vite.config.ts` stays `/`. The build copies `dist/index.html` to `dist/404.html` so `/network` and `/play/...` survive a refresh, and copies it to `dist/play/index.html` so `/play/?id=…` is a real file for crawlers. `/` is the new-puzzle form, and `/puzzles` redirects there.
+`base` in `vite.config.ts` stays `/`. The build copies `dist/index.html` to `dist/404.html` so `/network` and other SPA paths survive a refresh, and copies it to `dist/play/index.html` and `dist/about/index.html` so `/play/?id=…` and `/about` are real files (200 for crawlers / Telegram). `/` is the new-puzzle form, and `/puzzles` redirects there.
 
 If `actions/deploy-pages` returns 404, turn Pages on in the repository settings and set the source to GitHub Actions. The workflow cannot enable Pages itself.
