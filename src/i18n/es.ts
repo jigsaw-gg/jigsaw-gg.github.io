@@ -58,6 +58,7 @@ export const es: Messages = {
     version: 'Versión',
     commitShow: 'Ver commit',
     commitHide: 'Ocultar commit',
+    telegramDebug: 'Telegram Mini App',
   },
   puzzles: {
     title: 'Nuevo puzle',
@@ -102,8 +103,10 @@ export const es: Messages = {
       'Las posiciones de las piezas se guardan en este navegador. Cerrar la pestaña, o perder la conexión, no reinicia el puzle. El anfitrión desempata cuando dos jugadores confirman la misma pieza a la vez. Un movimiento más reciente sustituye a uno anterior.',
     waitingOthers: 'Esperando a que se unan otros jugadores.',
     invite: 'Enlace de invitación',
+    inviteTelegram: 'Invitación de Telegram Mini App',
     copied: 'Copiado',
     copyInvite: 'Copiar invitación',
+    copyInviteTelegram: 'Copiar invitación de Telegram',
     play: 'Jugar',
     channel: 'Canal',
     channelStatus: 'Estado del canal',

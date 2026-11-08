@@ -39,14 +39,28 @@ Client events go on private channels, use a `client-*` name, and are not echoed 
 
 ## Puzzle sessions
 
-The invite path is `/play/<id>`. New ids are 21-character NanoIDs; older UUIDs still resolve. The channel name is `private-puzzle-<id>`. One channel per session, so a client only sends and receives that session's events. The `private-` prefix is what lets Apinator relay those client events. Knowing the channel name is enough to join.
+The web invite path is `/play/?id=<id>` (a real `play/index.html` on Pages so Telegram and other crawlers get HTTP 200 and can read OG tags). Legacy `/play/<id>` redirects there. New ids are 21-character NanoIDs; older UUIDs still resolve. The channel name is `private-puzzle-<id>`. One channel per session, so a client only sends and receives that session's events. The `private-` prefix is what lets Apinator relay those client events. Knowing the channel name is enough to join.
 
 Setup (image URL, pixel size, piece count, seed) is stored under `jigsaw-session:<id>` and shared with `client-session-request` and `client-session-offer`.
 
 Outer piece edges stay on the image rectangle. Inner edges are the seeded cuts. Load the puzzle image with a plain `Image()` and leave `crossOrigin` unset, or some hosts refuse the request and the picture never appears.
 
+## Telegram Mini App
+
+The site root `https://jigsaw-gg.github.io/` is the Mini App URL in BotFather. Bot username `Jigsaw_GG_Bot`, short name `tg_miniapp`, title `Jigsaw GG`. Deep links:
+
+```text
+https://t.me/Jigsaw_GG_Bot/tg_miniapp?startapp=<session-id>
+```
+
+Telegram opens the Mini App and injects `start_param` (also available as `tgWebAppStartParam`). The React app reads that, normalizes it, and routes to `/play/?id=…`. No bot backend (webhooks / long polling) is required for launch or invite routing; Apinator still carries game traffic.
+
+Identity is hardcoded as a fallback, overridable locally via `config.json` (`telegram_bot_username`, `telegram_mini_app_short_name`, `telegram_mini_app_title`) and flagged to move to `.env` / CI (`VITE_TELEGRAM_BOT_USERNAME`, `VITE_TELEGRAM_MINI_APP_SHORT_NAME`, `VITE_TELEGRAM_MINI_APP_TITLE`).
+
+Web invites stay on GitHub Pages for link previews. The play page also shows a copyable Telegram deep link. About shows Mini App debug fields.
+
 ## GitHub Pages
 
-`base` in `vite.config.ts` stays `/`. The build copies `dist/index.html` to `dist/404.html` so `/network` and `/play/...` survive a refresh. `/` is the new-puzzle form, and `/puzzles` redirects there.
+`base` in `vite.config.ts` stays `/`. The build copies `dist/index.html` to `dist/404.html` so `/network` and `/play/...` survive a refresh, and copies it to `dist/play/index.html` so `/play/?id=…` is a real file for crawlers. `/` is the new-puzzle form, and `/puzzles` redirects there.
 
 If `actions/deploy-pages` returns 404, turn Pages on in the repository settings and set the source to GitHub Actions. The workflow cannot enable Pages itself.

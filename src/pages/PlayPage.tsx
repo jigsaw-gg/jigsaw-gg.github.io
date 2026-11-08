@@ -19,6 +19,13 @@ import { chooseGrid } from '../puzzle/cut.ts'
 import { normalizeSessionId, playInvitePath } from '../puzzle/session.ts'
 import { usePuzzleSession } from '../puzzle/usePuzzleSession.ts'
 import { useWorldSync } from '../puzzle/useWorldSync.ts'
+import { playTelegramInviteUrl } from '../telegram/config.ts'
+import { useTelegramBackHandler } from '../telegram/useTelegramBackHandler.ts'
+import { useTelegramMainButton } from '../telegram/useTelegramMainButton.ts'
+import {
+  hapticNotification,
+  telegramSuggestedPlayerName,
+} from '../telegram/webApp.ts'
 
 export function PlayPage() {
   const { messages } = useI18n()
@@ -38,10 +45,11 @@ export function PlayPage() {
 }
 
 function PlayEntry({ sessionId }: { sessionId: string }) {
-  const { locale, messages } = useI18n()
+  const { locale } = useI18n()
   const [routedName] = useState(peekConfirmedPlayerName)
   const [nameDraft, setNameDraft] = useState(() => {
-    const preset = routedName || readPlayerName()
+    const preset =
+      routedName || readPlayerName() || telegramSuggestedPlayerName()
     if (preset) return { locale, name: preset, suggested: false }
     return { locale, name: suggestPlayerName(locale), suggested: true }
   })
@@ -53,7 +61,7 @@ function PlayEntry({ sessionId }: { sessionId: string }) {
   ) {
     setNameDraft({
       locale,
-      name: suggestPlayerName(locale),
+      name: telegramSuggestedPlayerName() || suggestPlayerName(locale),
       suggested: true,
     })
   }
@@ -74,35 +82,65 @@ function PlayEntry({ sessionId }: { sessionId: string }) {
   }, [routedName])
 
   if (!confirmedName) {
-    const name = normalizePlayerName(playerName)
     return (
-      <main className="page">
-        <h1>{messages.play.joinTitle}</h1>
-        <p className="lede">{messages.play.joinLede}</p>
-        <form
-          className="setup"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (!name) return
-            writePlayerName(name)
-            setPlayerName(name)
-            setConfirmedName(name)
-          }}
-        >
-          <PlayerNameField
-            value={playerName}
-            onChange={setPlayerName}
-            autoFocus
-          />
-          <button type="submit" className="button" disabled={name === null}>
-            {messages.play.join}
-          </button>
-        </form>
-      </main>
+      <PlayJoinForm
+        playerName={playerName}
+        setPlayerName={setPlayerName}
+        onConfirm={(name) => {
+          writePlayerName(name)
+          setPlayerName(name)
+          setConfirmedName(name)
+        }}
+      />
     )
   }
 
   return <PlaySession sessionId={sessionId} playerName={confirmedName} />
+}
+
+function PlayJoinForm({
+  playerName,
+  setPlayerName,
+  onConfirm,
+}: {
+  playerName: string
+  setPlayerName: (name: string) => void
+  onConfirm: (name: string) => void
+}) {
+  const { messages } = useI18n()
+  const name = normalizePlayerName(playerName)
+  function submit() {
+    if (!name) return
+    onConfirm(name)
+  }
+  useTelegramMainButton({
+    text: messages.play.join,
+    visible: true,
+    enabled: name !== null,
+    onClick: submit,
+  })
+  return (
+    <main className="page">
+      <h1>{messages.play.joinTitle}</h1>
+      <p className="lede">{messages.play.joinLede}</p>
+      <form
+        className="setup"
+        onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}
+      >
+        <PlayerNameField
+          value={playerName}
+          onChange={setPlayerName}
+          autoFocus
+        />
+        <button type="submit" className="button" disabled={name === null}>
+          {messages.play.join}
+        </button>
+      </form>
+    </main>
+  )
 }
 
 function playerLabel(
@@ -136,7 +174,8 @@ function PlaySession({
     players,
   )
   const inviteUrl = `${window.location.origin}${playInvitePath(sessionId)}`
-  const [copied, setCopied] = useState(false)
+  const telegramInviteUrl = playTelegramInviteUrl(sessionId)
+  const [copied, setCopied] = useState<'web' | 'telegram' | null>(null)
   const [playing, setPlaying] = useState(false)
   const [keepBoard, setKeepBoard] = useState(false)
   const playRef = useRef<HTMLButtonElement>(null)
@@ -144,6 +183,24 @@ function PlaySession({
     ? chooseGrid(setup.pieceCount, setup.imageWidth, setup.imageHeight)
     : null
   const others = players.filter((player) => !player.self)
+
+  function enterPlay() {
+    setKeepBoard(true)
+    setPlaying(true)
+  }
+
+  function leavePlay() {
+    setPlaying(false)
+    window.requestAnimationFrame(() => playRef.current?.focus())
+  }
+
+  useTelegramBackHandler(leavePlay, playing)
+  useTelegramMainButton({
+    text: text.play,
+    visible: !playing,
+    enabled: Boolean(setup),
+    onClick: enterPlay,
+  })
 
   useEffect(() => {
     if (!playing) return
@@ -203,23 +260,16 @@ function PlaySession({
     }
   }, [playing])
 
-  function enterPlay() {
-    setKeepBoard(true)
-    setPlaying(true)
-  }
-
-  function leavePlay() {
-    setPlaying(false)
-    window.requestAnimationFrame(() => playRef.current?.focus())
-  }
-
-  async function copyInvite() {
+  async function copyInvite(kind: 'web' | 'telegram') {
+    const value = kind === 'telegram' ? telegramInviteUrl : inviteUrl
     try {
-      await navigator.clipboard.writeText(inviteUrl)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(value)
+      setCopied(kind)
+      hapticNotification('success')
+      window.setTimeout(() => setCopied(null), 2000)
     } catch {
-      setCopied(false)
+      setCopied(null)
+      hapticNotification('error')
     }
   }
 
@@ -258,9 +308,24 @@ function PlaySession({
           <button
             type="button"
             className="button"
-            onClick={() => void copyInvite()}
+            onClick={() => void copyInvite('web')}
           >
-            {copied ? text.copied : text.copyInvite}
+            {copied === 'web' ? text.copied : text.copyInvite}
+          </button>
+          <label className="field">
+            <span>{text.inviteTelegram}</span>
+            <input
+              readOnly
+              value={telegramInviteUrl}
+              onFocus={(event) => event.target.select()}
+            />
+          </label>
+          <button
+            type="button"
+            className="button"
+            onClick={() => void copyInvite('telegram')}
+          >
+            {copied === 'telegram' ? text.copied : text.copyInviteTelegram}
           </button>
           <button
             ref={playRef}

@@ -55,6 +55,7 @@ export interface Messages {
     version: string
     commitShow: string
     commitHide: string
+    telegramDebug: string
   }
   puzzles: {
     title: string
@@ -94,8 +95,10 @@ export interface Messages {
     persistence: string
     waitingOthers: string
     invite: string
+    inviteTelegram: string
     copied: string
     copyInvite: string
+    copyInviteTelegram: string
     play: string
     channel: string
     channelStatus: string

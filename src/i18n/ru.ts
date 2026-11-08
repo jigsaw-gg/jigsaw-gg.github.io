@@ -67,6 +67,7 @@ export const ru: Messages = {
     version: 'Версия',
     commitShow: 'Показать коммит',
     commitHide: 'Скрыть коммит',
+    telegramDebug: 'Telegram Mini App',
   },
   puzzles: {
     title: 'Новый пазл',
@@ -111,8 +112,10 @@ export const ru: Messages = {
       'Положения деталей сохраняются в этом браузере. Закрытие вкладки или потеря связи не сбрасывает пазл. Ведущий разрешает спор, когда двое игроков одновременно подтверждают одну деталь. Более новый ход заменяет более старый.',
     waitingOthers: 'Ожидание других игроков.',
     invite: 'Ссылка-приглашение',
+    inviteTelegram: 'Приглашение Telegram Mini App',
     copied: 'Скопировано',
     copyInvite: 'Копировать приглашение',
+    copyInviteTelegram: 'Копировать приглашение Telegram',
     play: 'Играть',
     channel: 'Канал',
     channelStatus: 'Состояние канала',

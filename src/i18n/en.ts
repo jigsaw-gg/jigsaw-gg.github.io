@@ -58,6 +58,7 @@ export const en: Messages = {
     version: 'Version',
     commitShow: 'Show commit',
     commitHide: 'Hide commit',
+    telegramDebug: 'Telegram Mini App',
   },
   puzzles: {
     title: 'New puzzle',
@@ -102,8 +103,10 @@ export const en: Messages = {
       'Piece positions are saved in this browser. Closing the tab, or losing the connection, does not reset the puzzle. The host breaks ties when two players commit the same piece at once. A newer move still replaces an older one.',
     waitingOthers: 'Waiting for other players to join.',
     invite: 'Invite link',
+    inviteTelegram: 'Telegram Mini App invite',
     copied: 'Copied',
     copyInvite: 'Copy invite',
+    copyInviteTelegram: 'Copy Telegram invite',
     play: 'Play',
     channel: 'Channel',
     channelStatus: 'Channel status',

@@ -26,12 +26,16 @@ export function writeThemePreference(preference: ThemePreference): void {
 }
 
 export function getSystemTheme(): ResolvedTheme {
+  // Lazy import avoided: callers in Mini App pass Telegram scheme via
+  // ThemeSwitcher / subscribeTelegramTheme. Browser fallback only here.
   return window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light'
 }
 
 export function resolveTheme(preference: ThemePreference): ResolvedTheme {
+  // Prefer Telegram's scheme when ThemeSwitcher wires it; this helper stays
+  // browser-only for early paint / non-React callers.
   return preference === 'system' ? getSystemTheme() : preference
 }
 

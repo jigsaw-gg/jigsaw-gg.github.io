@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '../i18n/useI18n.ts'
 import {
+  readTelegramColorScheme,
+  subscribeTelegramTheme,
+} from '../telegram/webApp.ts'
+import {
   applyResolvedTheme,
+  getSystemTheme,
   readThemePreference,
-  resolveTheme,
+  type ResolvedTheme,
   type ThemePreference,
   writeThemePreference,
 } from '../theme.ts'
+
+function resolvePreferredTheme(preference: ThemePreference): ResolvedTheme {
+  if (preference !== 'system') return preference
+  return readTelegramColorScheme() ?? getSystemTheme()
+}
 
 export function ThemeSwitcher() {
   const { messages } = useI18n()
@@ -20,15 +30,21 @@ export function ThemeSwitcher() {
   )
 
   useEffect(() => {
-    applyResolvedTheme(resolveTheme(preference))
+    applyResolvedTheme(resolvePreferredTheme(preference))
     writeThemePreference(preference)
 
     if (preference !== 'system') return
 
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyResolvedTheme(resolveTheme('system'))
-    media.addEventListener('change', onChange)
-    return () => media.removeEventListener('change', onChange)
+    const onMedia = () => applyResolvedTheme(resolvePreferredTheme('system'))
+    media.addEventListener('change', onMedia)
+    const unsubscribeTelegram = subscribeTelegramTheme((theme) => {
+      applyResolvedTheme(theme)
+    })
+    return () => {
+      media.removeEventListener('change', onMedia)
+      unsubscribeTelegram()
+    }
   }, [preference])
 
   return (

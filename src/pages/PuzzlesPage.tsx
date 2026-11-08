@@ -18,12 +18,16 @@ import {
   writeSession,
   type PuzzleSetup,
 } from '../puzzle/session.ts'
+import { telegramSuggestedPlayerName } from '../telegram/webApp.ts'
+import { useTelegramMainButton } from '../telegram/useTelegramMainButton.ts'
 
 export function PuzzlesPage() {
   const navigate = useNavigate()
   const { messages } = useI18n()
   const text = messages.puzzles
-  const [playerName, setPlayerName] = useState(readPlayerName)
+  const [playerName, setPlayerName] = useState(
+    () => readPlayerName() || telegramSuggestedPlayerName(),
+  )
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE_URL)
   const [pieceCount, setPieceCount] = useState(String(DEFAULT_PIECE_COUNT))
   const [seed] = useState(() => crypto.getRandomValues(new Uint32Array(1))[0])
@@ -85,6 +89,13 @@ export function PuzzlesPage() {
     writeSession(sessionId, setup)
     navigate(playInvitePath(sessionId))
   }
+
+  useTelegramMainButton({
+    text: text.start,
+    visible: true,
+    enabled: canStart,
+    onClick: start,
+  })
 
   function pickGalleryImage(url: string) {
     setImageUrl(url)

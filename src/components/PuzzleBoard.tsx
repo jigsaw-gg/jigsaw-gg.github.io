@@ -47,6 +47,7 @@ import {
   type ThumbSide,
 } from '../puzzle/twoThumb.ts'
 import type { RemoteCursor } from '../puzzle/useWorldSync.ts'
+import { hapticImpact } from '../telegram/webApp.ts'
 
 /** Nearby-piece glow fade, in milliseconds. */
 const GLOW_MS = 260
@@ -1159,6 +1160,7 @@ function PuzzleTable({
     setPlacements(placements)
     setFrontGroup(drag.group)
     if (result.snapped) {
+      hapticImpact('medium')
       launchSnap(moved, placements)
       pulseGroup(drag.group)
       onDrag(placements, drag.id)

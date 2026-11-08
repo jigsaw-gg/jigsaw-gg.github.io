@@ -13,6 +13,7 @@ import { NetworkStatusPage } from './pages/NetworkStatusPage.tsx'
 import { PlayPage } from './pages/PlayPage.tsx'
 import { PuzzlesPage } from './pages/PuzzlesPage.tsx'
 import { normalizeSessionId, playInvitePath } from './puzzle/session.ts'
+import { TelegramUi } from './telegram/TelegramUi.tsx'
 import { useApinatorStatus } from './useApinatorStatus.ts'
 import './App.css'
 
@@ -34,24 +35,26 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="app">
-        <SiteHeader state={status.state} />
-        <div className="app__main">
-          <Routes>
-            <Route path="/" element={<PuzzlesPage />} />
-            <Route
-              path="/network"
-              element={<NetworkStatusPage status={status} />}
-            />
-            <Route path="/puzzles" element={<Navigate to="/" replace />} />
-            <Route path="/play" element={<PlayInviteRoute />} />
-            <Route path="/play/:sessionId" element={<LegacyPlayRedirect />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+      <TelegramUi>
+        <div className="app">
+          <SiteHeader state={status.state} />
+          <div className="app__main">
+            <Routes>
+              <Route path="/" element={<PuzzlesPage />} />
+              <Route
+                path="/network"
+                element={<NetworkStatusPage status={status} />}
+              />
+              <Route path="/puzzles" element={<Navigate to="/" replace />} />
+              <Route path="/play" element={<PlayInviteRoute />} />
+              <Route path="/play/:sessionId" element={<LegacyPlayRedirect />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
+          <EmbeddedSafariWarning />
         </div>
-        <EmbeddedSafariWarning />
-      </div>
+      </TelegramUi>
     </BrowserRouter>
   )
 }

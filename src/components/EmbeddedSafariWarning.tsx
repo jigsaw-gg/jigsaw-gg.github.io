@@ -4,12 +4,15 @@ import {
   readEmbeddedSafariSignals,
 } from '../embeddedSafari.ts'
 import { useI18n } from '../i18n/useI18n.ts'
+import { isTelegramMiniApp } from '../telegram/webApp.ts'
 
 export function EmbeddedSafariWarning() {
   const { messages } = useI18n()
-  const [embedded] = useState(() =>
-    isEmbeddedMobileSafari(readEmbeddedSafariSignals()),
-  )
+  const [embedded] = useState(() => {
+    // Mini App is intentional; do not nudge users toward Safari.
+    if (isTelegramMiniApp()) return false
+    return isEmbeddedMobileSafari(readEmbeddedSafariSignals())
+  })
   const ref = useRef<HTMLParagraphElement>(null)
 
   useEffect(() => {

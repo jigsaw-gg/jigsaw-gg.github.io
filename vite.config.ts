@@ -58,6 +58,63 @@ function resolveAppSecret(mode: string): string {
   return raw.trim()
 }
 
+type LocalConfig = {
+  telegram_bot_username?: string
+  telegram_mini_app_short_name?: string
+  telegram_mini_app_title?: string
+}
+
+function readLocalConfig(): LocalConfig {
+  try {
+    return JSON.parse(
+      readFileSync(resolve('config.json'), 'utf8'),
+    ) as LocalConfig
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * BotFather Mini App identity for deep links.
+ *
+ * TODO(env): prefer `.env` / CI (`VITE_TELEGRAM_*` or `TELEGRAM_*`). Local
+ * `config.json` overrides for worktree/dev. Hardcoded defaults match the
+ * published bot until env is wired in the Pages workflow.
+ */
+function resolveTelegramIdentity(mode: string): {
+  bot: string
+  app: string
+  title: string
+} {
+  const fileEnv = loadEnv(mode, process.cwd(), '')
+  const local = readLocalConfig()
+  const bot = (
+    process.env.VITE_TELEGRAM_BOT_USERNAME ||
+    process.env.TELEGRAM_BOT_USERNAME ||
+    fileEnv.VITE_TELEGRAM_BOT_USERNAME ||
+    fileEnv.TELEGRAM_BOT_USERNAME ||
+    local.telegram_bot_username ||
+    'Jigsaw_GG_Bot'
+  ).trim()
+  const app = (
+    process.env.VITE_TELEGRAM_MINI_APP_SHORT_NAME ||
+    process.env.TELEGRAM_MINI_APP_SHORT_NAME ||
+    fileEnv.VITE_TELEGRAM_MINI_APP_SHORT_NAME ||
+    fileEnv.TELEGRAM_MINI_APP_SHORT_NAME ||
+    local.telegram_mini_app_short_name ||
+    'tg_miniapp'
+  ).trim()
+  const title = (
+    process.env.VITE_TELEGRAM_MINI_APP_TITLE ||
+    process.env.TELEGRAM_MINI_APP_TITLE ||
+    fileEnv.VITE_TELEGRAM_MINI_APP_TITLE ||
+    fileEnv.TELEGRAM_MINI_APP_TITLE ||
+    local.telegram_mini_app_title ||
+    'Jigsaw GG'
+  ).trim()
+  return { bot, app, title }
+}
+
 // NanoID from createSessionId, or a previously issued UUID. Keep in sync with session.ts.
 const PUZZLE_CHANNEL =
   /^private-puzzle-(?:[A-Za-z0-9_-]{21}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
@@ -221,6 +278,7 @@ function worktreeDevPort(): number | undefined {
 export default defineConfig(({ mode }) => {
   const port = worktreeDevPort()
   const build = resolveBuildInfo()
+  const telegram = resolveTelegramIdentity(mode)
   return {
     // jigsaw-gg.github.io is served from the domain root.
     base: '/',
@@ -235,6 +293,15 @@ export default defineConfig(({ mode }) => {
       ),
       'import.meta.env.VITE_APINATOR_APP_SECRET': JSON.stringify(
         resolveAppSecret(mode),
+      ),
+      'import.meta.env.VITE_TELEGRAM_BOT_USERNAME': JSON.stringify(
+        telegram.bot,
+      ),
+      'import.meta.env.VITE_TELEGRAM_MINI_APP_SHORT_NAME': JSON.stringify(
+        telegram.app,
+      ),
+      'import.meta.env.VITE_TELEGRAM_MINI_APP_TITLE': JSON.stringify(
+        telegram.title,
       ),
       'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(build.commit),
       'import.meta.env.VITE_BUILD_COMMIT_LOG': JSON.stringify(build.log),
