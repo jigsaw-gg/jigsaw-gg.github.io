@@ -21,27 +21,111 @@ export interface PuzzleModel {
   pieces: PieceModel[]
 }
 
+/** Columns and rows for nearly square pieces near `pieceCount`. The product may differ. */
 export function chooseGrid(
   pieceCount: number,
   imageWidth: number,
   imageHeight: number,
 ): { cols: number; rows: number } {
-  const count = Math.max(1, Math.floor(pieceCount))
-  const target = imageWidth / imageHeight
-  let bestCols = count
-  let bestRows = 1
-  let bestScore = Number.POSITIVE_INFINITY
-  for (let rows = 1; rows <= count; rows += 1) {
-    if (count % rows !== 0) continue
-    const cols = count / rows
-    const score = Math.abs(cols / rows - target)
-    if (score < bestScore) {
-      bestCols = cols
-      bestRows = rows
-      bestScore = score
+  const count = Math.floor(pieceCount)
+  if (
+    !Number.isFinite(count) ||
+    count < 1 ||
+    !(imageWidth > 0) ||
+    !(imageHeight > 0)
+  ) {
+    return { cols: 1, rows: 1 }
+  }
+
+  // Square whose area is the picture divided by the requested count.
+  const side = Math.sqrt((imageWidth * imageHeight) / count)
+  const idealCols = imageWidth / side
+  const idealRows = imageHeight / side
+  const colBand = axisBand(idealCols)
+  const rowBand = axisBand(idealRows)
+
+  let bestCols = colBand.rounded
+  let bestRows = rowBand.rounded
+  let bestKey = gridKey(
+    bestCols,
+    bestRows,
+    imageWidth,
+    imageHeight,
+    count,
+    idealCols,
+    idealRows,
+  )
+
+  for (let rows = rowBand.lo; rows <= rowBand.hi; rows += 1) {
+    for (let cols = colBand.lo; cols <= colBand.hi; cols += 1) {
+      const key = gridKey(
+        cols,
+        rows,
+        imageWidth,
+        imageHeight,
+        count,
+        idealCols,
+        idealRows,
+      )
+      if (betterGrid(key, bestKey)) {
+        bestCols = cols
+        bestRows = rows
+        bestKey = key
+      }
     }
   }
+
   return { cols: bestCols, rows: bestRows }
+}
+
+interface AxisBand {
+  lo: number
+  hi: number
+  rounded: number
+}
+
+function axisBand(ideal: number): AxisBand {
+  if (!Number.isFinite(ideal) || ideal < 1) {
+    return { lo: 1, hi: 1, rounded: 1 }
+  }
+  return {
+    lo: Math.max(1, Math.floor(ideal) - 1),
+    hi: Math.ceil(ideal) + 1,
+    rounded: Math.max(1, Math.round(ideal)),
+  }
+}
+
+// Lower is better: squareness, then distance from the requested count,
+// then distance from the real-valued grid, then the picture's orientation.
+function gridKey(
+  cols: number,
+  rows: number,
+  imageWidth: number,
+  imageHeight: number,
+  count: number,
+  idealCols: number,
+  idealRows: number,
+): number[] {
+  const pieceWidth = imageWidth / cols
+  const pieceHeight = imageHeight / rows
+  const ratio = pieceWidth / pieceHeight
+  const stretch = ratio >= 1 ? ratio : 1 / ratio
+  const countGap = Math.abs(cols * rows - count)
+  const drift = Math.abs(cols - idealCols) + Math.abs(rows - idealRows)
+  const across = imageWidth >= imageHeight
+  const turned = across ? cols < rows : rows < cols
+  return [stretch, countGap, drift, turned ? 1 : 0, rows, cols]
+}
+
+function betterGrid(next: readonly number[], best: readonly number[]): boolean {
+  const limit = Math.max(next.length, best.length)
+  for (let index = 0; index < limit; index += 1) {
+    const candidate = next[index] ?? 0
+    const current = best[index] ?? 0
+    if (candidate < current - 1e-9) return true
+    if (current < candidate - 1e-9) return false
+  }
+  return false
 }
 
 export function buildPuzzle(setup: PuzzleSetup): PuzzleModel {

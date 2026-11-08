@@ -7,6 +7,7 @@ import {
   rememberConfirmedPlayerName,
   writePlayerName,
 } from '../playerName.ts'
+import { chooseGrid } from '../puzzle/cut.ts'
 import {
   createSessionId,
   DEFAULT_IMAGE_URL,
@@ -50,6 +51,11 @@ export function PuzzlesPage() {
   const countOk = Number.isInteger(count) && count >= 1 && count <= 200
   const name = normalizePlayerName(playerName)
   const canStart = imageSize !== null && countOk && name !== null
+  const grid =
+    imageSize && countOk
+      ? chooseGrid(count, imageSize.width, imageSize.height)
+      : null
+  const actualPieces = grid ? grid.cols * grid.rows : null
 
   function start() {
     if (!imageSize || !countOk || !name) return
@@ -114,6 +120,20 @@ export function PuzzlesPage() {
                 : imageError
                   ? 'Unavailable'
                   : 'Loading…'}
+            </dd>
+          </div>
+          <div>
+            <dt>Arrangement</dt>
+            <dd>
+              {grid && actualPieces !== null
+                ? `${grid.cols} × ${grid.rows} · ${actualPieces} ${
+                    actualPieces === 1 ? 'piece' : 'pieces'
+                  }`
+                : countOk
+                  ? imageError
+                    ? 'Unavailable'
+                    : 'Loading…'
+                  : '—'}
             </dd>
           </div>
           <div>

@@ -234,7 +234,7 @@ function PlaySession({
               <div>
                 <dt>Pieces</dt>
                 <dd>
-                  {setup.pieceCount}
+                  {grid ? grid.cols * grid.rows : setup.pieceCount}
                   {grid ? ` · ${grid.cols} × ${grid.rows}` : ''}
                 </dd>
               </div>
