@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { isExpanded } from '../fullscreen.ts'
 import { FullscreenButton } from './FullscreenButton.tsx'
 import { useI18n } from '../i18n/useI18n.ts'
+import {
+  CRUISE_MAX_SPEED,
+  createCruise,
+  cruiseMargin,
+  cruiseVelocity,
+  cruiseZoom,
+  edgePull,
+  stepCruise,
+  type CruiseBody,
+  type EdgeBounds,
+} from '../puzzle/edgeCruise.ts'
 import { buildPuzzle, type PieceModel, type Point } from '../puzzle/cut.ts'
 import {
   approachLimits,
@@ -23,6 +35,7 @@ import type { RemoteCursor } from '../puzzle/useWorldSync.ts'
 
 /** Nearby-piece glow fade, in milliseconds. */
 const GLOW_MS = 260
+const MOBILE_LAYOUT = '(max-width: 1100px)'
 /**
  * Critically damped snap, in rad/s. The piece speeds up toward the join,
  * then settles on it.
@@ -317,6 +330,9 @@ function PuzzleTable({
   const panRef = useRef<Pan | null>(null)
   const pinchActiveRef = useRef(false)
   const finishDragRef = useRef<(commit: boolean) => void>(() => {})
+  const cruiseRef = useRef<ActiveCruise | null>(null)
+  const cruiseFrameRef = useRef(0)
+  const cruiseTickRef = useRef<(now: number) => void>(() => {})
   const userAdjustedRef = useRef(false)
   const viewportRef = useRef<HTMLDivElement>(null)
 
@@ -342,7 +358,10 @@ function PuzzleTable({
   }, [setup.imageUrl])
 
   useEffect(() => {
-    return () => cancelAnimationFrame(slideFrameRef.current)
+    return () => {
+      cancelAnimationFrame(slideFrameRef.current)
+      cancelAnimationFrame(cruiseFrameRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -393,7 +412,12 @@ function PuzzleTable({
   }, [sharedPlacements, yieldNonce, onDragCancel])
 
   useEffect(() => {
-    if (!active) onPointerGone()
+    if (!active) {
+      cruiseRef.current = null
+      cancelAnimationFrame(cruiseFrameRef.current)
+      cruiseFrameRef.current = 0
+      onPointerGone()
+    }
   }, [active, onPointerGone])
 
   useEffect(() => () => onPointerGone(), [onPointerGone])
@@ -404,6 +428,7 @@ function PuzzleTable({
     const onWheel = (event: WheelEvent) => {
       const current = viewRef.current
       if (!current) return
+      cruiseRef.current = null
       event.preventDefault()
       let delta = event.deltaY
       if (event.deltaMode === 1) delta *= 16
@@ -480,6 +505,7 @@ function PuzzleTable({
       event.preventDefault()
       event.stopPropagation()
       if (points.length > 2) return
+      cruiseRef.current = null
       finishDragRef.current(true)
       panRef.current = null
       setPanning(false)
@@ -580,6 +606,10 @@ function PuzzleTable({
 
   useEffect(() => {
     finishDragRef.current = finishDrag
+  })
+
+  useEffect(() => {
+    cruiseTickRef.current = cruiseTick
   })
 
   useEffect(() => {
@@ -727,6 +757,8 @@ function PuzzleTable({
         .filter((piece) => piece.group === placement.group)
         .map((piece) => piece.id),
     )
+    const cruise =
+      event.pointerType === 'touch' && window.matchMedia(MOBILE_LAYOUT).matches
     dragRef.current = {
       pointerId: event.pointerId,
       id,
@@ -734,7 +766,11 @@ function PuzzleTable({
       grabX: point.x - placement.x,
       grabY: point.y - placement.y,
       memberIds,
+      cruise,
+      clientX: event.clientX,
+      clientY: event.clientY,
     }
+    if (cruise) beginCruise(event.clientX, event.clientY)
     setFrontGroup(placement.group)
     setDragGroup(placement.group)
     onDrag(placementsRef.current, placement.id)
@@ -748,8 +784,20 @@ function PuzzleTable({
       finishDrag(true)
       return
     }
-    const point = playPoint(event)
-    if (!point) return
+    drag.clientX = event.clientX
+    drag.clientY = event.clientY
+    const snapped = moveDragTo(event.clientX, event.clientY)
+    if (snapped && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    if (dragRef.current?.cruise) pokeCruise()
+  }
+
+  function moveDragTo(clientX: number, clientY: number): boolean {
+    const drag = dragRef.current
+    if (!drag) return false
+    const point = playPoint({ clientX, clientY })
+    if (!point) return false
     const rawX = point.x - drag.grabX
     const rawY = point.y - drag.grabY
     const clamped = clampGroup(
@@ -814,13 +862,181 @@ function PuzzleTable({
       pulseGroup(drag.group)
       onDrag(placements, drag.id)
       finishDrag(true)
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId)
-      }
-      return
+      return true
     }
     setNear(result.near)
     onDrag(placements, drag.id)
+    return false
+  }
+
+  function beginCruise(clientX: number, clientY: number) {
+    const viewport = viewportRef.current
+    const current = viewRef.current
+    if (!viewport || !current) return
+    const rect = viewport.getBoundingClientRect()
+    const previous = cruiseRef.current
+    cruiseRef.current = {
+      body: createCruise(),
+      baseZoom: previous?.baseZoom ?? current.zoom,
+      anchorX: clientX - rect.left,
+      anchorY: clientY - rect.top,
+      lastTime: 0,
+    }
+    pokeCruise()
+  }
+
+  function pokeCruise() {
+    if (cruiseFrameRef.current !== 0) return
+    cruiseFrameRef.current = requestAnimationFrame((now) => {
+      cruiseTickRef.current(now)
+    })
+  }
+
+  function cruiseTick(now: number) {
+    cruiseFrameRef.current = 0
+    const cruise = cruiseRef.current
+    if (!cruise || pinchActiveRef.current || panRef.current) {
+      cruiseRef.current = null
+      return
+    }
+    const viewport = viewportRef.current
+    const current = viewRef.current
+    if (!viewport || !current) return
+    if (cruise.lastTime === 0) {
+      cruise.lastTime = now
+      pokeCruise()
+      return
+    }
+    const dt = Math.min(0.05, Math.max(0, (now - cruise.lastTime) / 1000))
+    cruise.lastTime = now
+    const drag = dragRef.current
+    if (!drag?.cruise) {
+      if (easeCruiseZoom(cruise, current, viewport, dt)) {
+        cruiseRef.current = null
+      } else pokeCruise()
+      return
+    }
+    const rect = viewport.getBoundingClientRect()
+    const bounds = touchEdgeBounds(isExpanded(), rect)
+    const margin = cruiseMargin(
+      bounds.right - bounds.left,
+      bounds.bottom - bounds.top,
+    )
+    const pull = edgePull(
+      drag.clientX,
+      drag.clientY,
+      bounds,
+      margin,
+      CRUISE_MAX_SPEED,
+    )
+    const body = stepCruise(cruise.body, pull, dt)
+    cruise.body = body
+    const velocity = cruiseVelocity(body)
+    const limits = cameraLimits(
+      rect.width,
+      rect.height,
+      area,
+      Math.min(layout.cellW, layout.cellH),
+    )
+    const cursorX = drag.clientX - rect.left
+    const cursorY = drag.clientY - rect.top
+    cruise.anchorX = cursorX
+    cruise.anchorY = cursorY
+    const zoom = cruiseZoom(
+      cruise.baseZoom,
+      body.speed,
+      CRUISE_MAX_SPEED,
+      limits.min,
+      allowsMotion(),
+    )
+    const travel = Math.hypot(velocity.x, velocity.y) * dt
+    if (travel < 0.02 && Math.abs(zoom - current.zoom) < 1e-4) {
+      if (cruiseLive(cruise, pull.speed, current.zoom)) pokeCruise()
+      return
+    }
+    let next: Camera = {
+      zoom: current.zoom,
+      x: current.x + velocity.x * dt,
+      y: current.y + velocity.y * dt,
+    }
+    if (Math.abs(zoom - next.zoom) > 1e-4 && next.zoom > 0) {
+      next = zoomCamera(
+        next,
+        cursorX,
+        cursorY,
+        zoom / next.zoom,
+        limits.min,
+        limits.max,
+      )
+    }
+    const savedGrabX = drag.grabX
+    const savedGrabY = drag.grabY
+    viewRef.current = next
+    moveDragTo(drag.clientX, drag.clientY)
+    const held = dragRef.current
+    if (held?.cruise) {
+      const anchor = placementsRef.current.find((piece) => piece.id === held.id)
+      if (anchor) {
+        const screenX = (anchor.x + savedGrabX) * next.zoom + next.x
+        const screenY = (anchor.y + savedGrabY) * next.zoom + next.y
+        const errX = screenX - cursorX
+        const errY = screenY - cursorY
+        if (Math.hypot(errX, errY) > 0.75) {
+          next = { ...next, x: next.x - errX, y: next.y - errY }
+          held.grabX = savedGrabX
+          held.grabY = savedGrabY
+          const blocked = Math.hypot(errX, errY)
+          const kept = travel > 0.4 ? Math.max(0, 1 - blocked / travel) : 0
+          cruise.body = {
+            ...cruise.body,
+            speed: cruise.body.speed * (0.72 + 0.28 * kept),
+            accel: Math.min(0, cruise.body.accel * kept),
+          }
+        }
+      }
+    }
+    userAdjustedRef.current = true
+    viewRef.current = next
+    setView(next)
+    publishPointer(drag.clientX, drag.clientY)
+    if (dragRef.current?.cruise) {
+      if (cruiseLive(cruise, pull.speed, next.zoom)) pokeCruise()
+      return
+    }
+    if (Math.abs(next.zoom - cruise.baseZoom) > 1e-3) pokeCruise()
+  }
+
+  function easeCruiseZoom(
+    cruise: ActiveCruise,
+    current: Camera,
+    viewport: HTMLDivElement,
+    dt: number,
+  ): boolean {
+    const rect = viewport.getBoundingClientRect()
+    const limits = cameraLimits(
+      rect.width,
+      rect.height,
+      area,
+      Math.min(layout.cellW, layout.cellH),
+    )
+    const goal = Math.min(limits.max, Math.max(limits.min, cruise.baseZoom))
+    if (!(current.zoom > 0) || Math.abs(goal - current.zoom) < 0.002) {
+      return true
+    }
+    const zoom = allowsMotion()
+      ? current.zoom + (goal - current.zoom) * (1 - Math.exp(-dt / 0.24))
+      : goal
+    const next = zoomCamera(
+      current,
+      cruise.anchorX,
+      cruise.anchorY,
+      zoom / current.zoom,
+      limits.min,
+      limits.max,
+    )
+    userAdjustedRef.current = true
+    commitView(next)
+    return Math.abs(goal - next.zoom) < 0.002
   }
 
   function onPointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
@@ -1061,6 +1277,17 @@ interface Drag {
   grabX: number
   grabY: number
   memberIds: Set<string>
+  cruise: boolean
+  clientX: number
+  clientY: number
+}
+
+interface ActiveCruise {
+  body: CruiseBody
+  baseZoom: number
+  anchorX: number
+  anchorY: number
+  lastTime: number
 }
 
 interface Pan {
@@ -1080,6 +1307,36 @@ interface PinchSpan {
   dist: number
   x: number
   y: number
+}
+
+function cruiseLive(
+  cruise: ActiveCruise,
+  pullSpeed: number,
+  zoom: number,
+): boolean {
+  return (
+    pullSpeed > 1 ||
+    cruise.body.speed > 0.5 ||
+    Math.abs(cruise.body.accel) > 1 ||
+    Math.abs(zoom - cruise.baseZoom) > 1e-3
+  )
+}
+
+function touchEdgeBounds(fullscreen: boolean, canvas: DOMRect): EdgeBounds {
+  if (!fullscreen) {
+    return {
+      left: canvas.left,
+      top: canvas.top,
+      right: canvas.right,
+      bottom: canvas.bottom,
+    }
+  }
+  const visual = window.visualViewport
+  const left = visual?.offsetLeft ?? 0
+  const top = visual?.offsetTop ?? 0
+  const width = visual?.width ?? window.innerWidth
+  const height = visual?.height ?? window.innerHeight
+  return { left, top, right: left + width, bottom: top + height }
 }
 
 function pinchSpan(points: readonly ScreenPoint[]): PinchSpan | null {
