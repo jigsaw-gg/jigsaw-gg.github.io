@@ -147,10 +147,20 @@ function PlaySession({
 
   useEffect(() => {
     if (!playing) return
+    const root = document.documentElement
     const previous = document.body.style.overflow
+    const previousRootOverscroll = root.style.overscrollBehavior
+    const previousBodyOverscroll = document.body.style.overscrollBehavior
+    const previousRootTouch = root.style.touchAction
+    const previousBodyTouch = document.body.style.touchAction
     document.body.style.overflow = 'hidden'
+    root.style.overscrollBehavior = 'none'
+    document.body.style.overscrollBehavior = 'none'
+    root.style.touchAction = 'none'
+    document.body.style.touchAction = 'none'
     const header = document.querySelector('.topbar')
     if (header instanceof HTMLElement) header.inert = true
+    const edgeTouches = new Set<number>()
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       if (fullscreenElement()) return
@@ -161,11 +171,35 @@ function PlaySession({
       setPlaying(false)
       window.requestAnimationFrame(() => playRef.current?.focus())
     }
+    const onTouchStart = (event: TouchEvent) => {
+      claimHistoryEdge(event, edgeTouches)
+    }
+    const onTouchMove = (event: TouchEvent) => {
+      holdHistoryEdge(event, edgeTouches)
+    }
+    const onTouchEnd = (event: TouchEvent) => {
+      for (const touch of event.changedTouches) {
+        edgeTouches.delete(touch.identifier)
+      }
+    }
+    const edgeListener = { capture: true, passive: false } as const
     window.addEventListener('keydown', onKey)
+    window.addEventListener('touchstart', onTouchStart, edgeListener)
+    window.addEventListener('touchmove', onTouchMove, edgeListener)
+    window.addEventListener('touchend', onTouchEnd, edgeListener)
+    window.addEventListener('touchcancel', onTouchEnd, edgeListener)
     return () => {
       document.body.style.overflow = previous
+      root.style.overscrollBehavior = previousRootOverscroll
+      document.body.style.overscrollBehavior = previousBodyOverscroll
+      root.style.touchAction = previousRootTouch
+      document.body.style.touchAction = previousBodyTouch
       if (header instanceof HTMLElement) header.inert = false
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('touchstart', onTouchStart, edgeListener)
+      window.removeEventListener('touchmove', onTouchMove, edgeListener)
+      window.removeEventListener('touchend', onTouchEnd, edgeListener)
+      window.removeEventListener('touchcancel', onTouchEnd, edgeListener)
     }
   }, [playing])
 
@@ -305,5 +339,41 @@ function PlaySession({
         />
       )}
     </>
+  )
+}
+
+/** Safari and Chrome start a history swipe in this strip at the screen edge. */
+const HISTORY_EDGE_PX = 32
+
+/**
+ * A touch that begins on the screen edge is the browser's back or forward
+ * swipe. Claiming it here keeps the rest of that gesture for the board.
+ */
+function claimHistoryEdge(event: TouchEvent, edgeTouches: Set<number>): void {
+  if (isPageControl(event.target)) return
+  let claimed = false
+  for (const touch of event.changedTouches) {
+    const atEdge =
+      touch.clientX < HISTORY_EDGE_PX ||
+      touch.clientX > window.innerWidth - HISTORY_EDGE_PX
+    if (!atEdge) continue
+    edgeTouches.add(touch.identifier)
+    claimed = true
+  }
+  if (claimed) event.preventDefault()
+}
+
+function holdHistoryEdge(event: TouchEvent, edgeTouches: Set<number>): void {
+  for (const touch of event.touches) {
+    if (!edgeTouches.has(touch.identifier)) continue
+    event.preventDefault()
+    return
+  }
+}
+
+function isPageControl(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('button, a, input, textarea, select, label') !== null
   )
 }

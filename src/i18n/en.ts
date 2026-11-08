@@ -120,6 +120,8 @@ export const en: Messages = {
     back: 'Back',
     piece: (row, col) => `Piece ${row}-${col}`,
     pointer: (name) => `${name}'s pointer`,
+    handoverRight: 'Passing the piece to the right thumb',
+    handoverLeft: 'Passing the piece to the left thumb',
   },
   errors: {
     appKeyMissing: 'App key is not set.',

@@ -1091,3 +1091,91 @@ html:has(.embedded-safari) .play-mode {
   text-overflow: ellipsis;
   color: #fff;
 }
+
+.thumb-stick {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.thumb-stick__half {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--board-edge) 38%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--board-edge) 5%, transparent);
+}
+
+.thumb-stick__arm {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.thumb-stick__arm line {
+  stroke: color-mix(in srgb, var(--board-edge) 50%, transparent);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.thumb-stick__range {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in srgb, var(--board-edge) 48%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 18%, transparent);
+  transform: translate(-50%, -50%);
+}
+
+.thumb-stick__knob {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 2px solid color-mix(in srgb, var(--board-edge) 72%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.28);
+}
+
+.thumb-handover {
+  position: absolute;
+  z-index: 6;
+  padding: 0.15rem 0.65rem 0.2rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  color: #fff;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: thumb-handover-blink 0.7s linear infinite;
+}
+
+@keyframes thumb-handover-blink {
+  0%,
+  42% {
+    opacity: 1;
+  }
+
+  50%,
+  92% {
+    opacity: 0.12;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb-handover {
+    animation: none;
+  }
+}

@@ -12,6 +12,7 @@ import {
   stepCruise,
   type CruiseBody,
   type EdgeBounds,
+  type EdgePull,
 } from '../puzzle/edgeCruise.ts'
 import { buildPuzzle, type PieceModel, type Point } from '../puzzle/cut.ts'
 import {
@@ -31,6 +32,20 @@ import {
   type ScatteredBoard,
 } from '../puzzle/play.ts'
 import type { PuzzleSetup } from '../puzzle/session.ts'
+import {
+  HANDOVER_MS,
+  halfEdgeBounds,
+  handoverMarks,
+  oppositeThumb,
+  stickDeflection,
+  stickDisc,
+  STICK_MAX_SPEED,
+  thumbSide,
+  twoThumbLayout,
+  type HandoverMarks,
+  type StickDisc,
+  type ThumbSide,
+} from '../puzzle/twoThumb.ts'
 import type { RemoteCursor } from '../puzzle/useWorldSync.ts'
 
 /** Nearby-piece glow fade, in milliseconds. */
@@ -295,6 +310,9 @@ function PuzzleTable({
   const [frontGroup, setFrontGroup] = useState<string | null>(null)
   const [dragGroup, setDragGroup] = useState<string | null>(null)
   const [panning, setPanning] = useState(false)
+  const [panStick, setPanStick] = useState<ThumbStickView | null>(null)
+  const [cruiseStick, setCruiseStick] = useState<ThumbStickView | null>(null)
+  const [handover, setHandover] = useState<HandoverView | null>(null)
   const offsetsRef = useRef(new Map<string, SlideOffset>())
   const slideFrameRef = useRef(0)
   const [offsets, setOffsets] = useState<ReadonlyMap<string, SlideOffset>>(
@@ -333,8 +351,27 @@ function PuzzleTable({
   const cruiseRef = useRef<ActiveCruise | null>(null)
   const cruiseFrameRef = useRef(0)
   const cruiseTickRef = useRef<(now: number) => void>(() => {})
+  const stickFrameRef = useRef(0)
+  const stickTickRef = useRef<(now: number) => void>(() => {})
+  const handoverTimerRef = useRef(0)
+  const handoverRef = useRef<HandoverView | null>(null)
+  const cruiseStickRef = useRef<ThumbStickView | null>(null)
   const userAdjustedRef = useRef(false)
   const viewportRef = useRef<HTMLDivElement>(null)
+  const activeSeen = useRef(active)
+  if (activeSeen.current !== active) {
+    activeSeen.current = active
+    if (!active) {
+      panRef.current = null
+      cruiseStickRef.current = null
+      handoverRef.current = null
+      if (dragRef.current) dragRef.current.handoverSince = null
+      setPanning(false)
+      setPanStick(null)
+      setCruiseStick(null)
+      setHandover(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -361,6 +398,8 @@ function PuzzleTable({
     return () => {
       cancelAnimationFrame(slideFrameRef.current)
       cancelAnimationFrame(cruiseFrameRef.current)
+      cancelAnimationFrame(stickFrameRef.current)
+      window.clearTimeout(handoverTimerRef.current)
     }
   }, [])
 
@@ -386,6 +425,8 @@ function PuzzleTable({
     const shared = sharedPlacements
     if (yielded) {
       dragRef.current = null
+      clearHandover()
+      showCruiseStick(null)
       setDragGroup(null)
       setNear(null)
       offsetsRef.current.clear()
@@ -416,6 +457,11 @@ function PuzzleTable({
       cruiseRef.current = null
       cancelAnimationFrame(cruiseFrameRef.current)
       cruiseFrameRef.current = 0
+      panRef.current = null
+      cancelAnimationFrame(stickFrameRef.current)
+      stickFrameRef.current = 0
+      window.clearTimeout(handoverTimerRef.current)
+      handoverTimerRef.current = 0
       onPointerGone()
     }
   }, [active, onPointerGone])
@@ -508,7 +554,14 @@ function PuzzleTable({
       cruiseRef.current = null
       finishDragRef.current(true)
       panRef.current = null
+      cancelAnimationFrame(stickFrameRef.current)
+      stickFrameRef.current = 0
       setPanning(false)
+      setPanStick(null)
+      cruiseStickRef.current = null
+      setCruiseStick(null)
+      handoverRef.current = null
+      setHandover(null)
       for (const point of points) releaseCaptured(viewport, point)
       pinchActiveRef.current = true
       pinch = pinchSpan(points)
@@ -598,6 +651,8 @@ function PuzzleTable({
   function finishDrag(commit: boolean) {
     if (!dragRef.current) return
     dragRef.current = null
+    clearHandover()
+    showCruiseStick(null)
     setDragGroup(null)
     setNear(null)
     if (commit) onDragEnd(placementsRef.current)
@@ -610,6 +665,7 @@ function PuzzleTable({
 
   useEffect(() => {
     cruiseTickRef.current = cruiseTick
+    stickTickRef.current = stickPanTick
   })
 
   useEffect(() => {
@@ -688,24 +744,242 @@ function PuzzleTable({
     })
   }
 
+  function twoThumbNow(rect: DOMRect | null): boolean {
+    if (!rect) return false
+    return twoThumbLayout(
+      window.matchMedia(MOBILE_LAYOUT).matches,
+      rect.width,
+      rect.height,
+    )
+  }
+
+  function clearHandover() {
+    const drag = dragRef.current
+    if (drag) drag.handoverSince = null
+    window.clearTimeout(handoverTimerRef.current)
+    handoverTimerRef.current = 0
+    if (!handoverRef.current) return
+    handoverRef.current = null
+    setHandover(null)
+  }
+
+  function syncHandover(drag: Drag) {
+    const rect = viewportRef.current?.getBoundingClientRect() ?? null
+    if (!drag.thumb || !rect || !twoThumbNow(rect)) {
+      clearHandover()
+      return
+    }
+    const localX = drag.clientX - rect.left
+    const localY = drag.clientY - rect.top
+    const marks = handoverMarks(drag.thumb, localX, rect.width)
+    if (!marks) {
+      clearHandover()
+      return
+    }
+    const now = performance.now()
+    if (drag.handoverSince == null) drag.handoverSince = now
+    const elapsed = now - drag.handoverSince
+    if (elapsed >= HANDOVER_MS) {
+      drag.thumb = oppositeThumb(drag.thumb)
+      clearHandover()
+      return
+    }
+    const toward = marks === '>>>' ? 1 : -1
+    const view: HandoverView = {
+      marks,
+      x: rect.width / 2 + toward * 42,
+      y: Math.min(rect.height - 36, Math.max(36, localY - 36)),
+    }
+    const prev = handoverRef.current
+    if (
+      !prev ||
+      prev.marks !== view.marks ||
+      Math.abs(prev.x - view.x) > 0.5 ||
+      Math.abs(prev.y - view.y) > 0.5
+    ) {
+      handoverRef.current = view
+      setHandover(view)
+    }
+    if (handoverTimerRef.current !== 0) return
+    handoverTimerRef.current = window.setTimeout(
+      () => {
+        handoverTimerRef.current = 0
+        const current = dragRef.current
+        if (!current || current.pointerId !== drag.pointerId) return
+        syncHandover(current)
+      },
+      Math.max(0, HANDOVER_MS - elapsed),
+    )
+  }
+
+  function showCruiseStick(next: ThumbStickView | null) {
+    if (!cruiseStickRef.current && !next) return
+    cruiseStickRef.current = next
+    setCruiseStick(next)
+  }
+
+  function cruiseStickView(
+    drag: Drag,
+    rect: DOMRect,
+    pull: EdgePull,
+  ): ThumbStickView | null {
+    if (!drag.thumb || pull.speed < 24) return null
+    const localX = drag.clientX - rect.left
+    const localY = drag.clientY - rect.top
+    const disc = stickDisc(localX, localY, rect.width, rect.height, drag.thumb)
+    const strength = Math.min(1, pull.speed / CRUISE_MAX_SPEED)
+    const reach = Math.max(strength, 0.35) * disc.radius
+    return {
+      side: drag.thumb,
+      cx: localX - pull.x * reach,
+      cy: localY - pull.y * reach,
+      radius: disc.radius,
+      knobX: localX,
+      knobY: localY,
+    }
+  }
+
+  function publishPanStick() {
+    const pan = panRef.current
+    if (!pan?.stick || !pan.disc || !pan.side) {
+      setPanStick(null)
+      return
+    }
+    const def = stickDeflection(pan.fingerX, pan.fingerY, pan.disc)
+    setPanStick({
+      side: pan.side,
+      cx: pan.disc.cx,
+      cy: pan.disc.cy,
+      radius: pan.disc.radius,
+      knobX: def.knobX,
+      knobY: def.knobY,
+    })
+  }
+
+  function pokeStickPan() {
+    if (stickFrameRef.current !== 0) return
+    stickFrameRef.current = requestAnimationFrame((now) => {
+      stickFrameRef.current = 0
+      stickTickRef.current(now)
+    })
+  }
+
+  function stickPanTick(now: number) {
+    const pan = panRef.current
+    if (!pan?.stick || !pan.disc || pinchActiveRef.current) return
+    if (pan.last === 0) {
+      pan.last = now
+      pokeStickPan()
+      return
+    }
+    const dt = Math.min(0.05, Math.max(0, (now - pan.last) / 1000))
+    pan.last = now
+    const current = viewRef.current
+    const viewport = viewportRef.current
+    if (!current || !viewport) return
+    const def = stickDeflection(pan.fingerX, pan.fingerY, pan.disc)
+    const speed = def.amount * def.amount * STICK_MAX_SPEED
+    if (speed > 1) {
+      let next: Camera = {
+        ...current,
+        x: current.x + def.x * speed * dt,
+        y: current.y + def.y * speed * dt,
+      }
+      const drag = dragRef.current
+      if (drag && drag.pointerId !== pan.pointerId) {
+        next = lockHeldPiece(next, drag, viewport)
+      }
+      userAdjustedRef.current = true
+      commitView(next)
+      const held = dragRef.current
+      if (held) publishPointer(held.clientX, held.clientY)
+    }
+    if (panRef.current?.stick) pokeStickPan()
+  }
+
+  function lockHeldPiece(
+    next: Camera,
+    drag: Drag,
+    viewport: HTMLDivElement,
+  ): Camera {
+    const savedGrabX = drag.grabX
+    const savedGrabY = drag.grabY
+    viewRef.current = next
+    moveDragTo(drag.clientX, drag.clientY)
+    const held = dragRef.current
+    if (!held) return viewRef.current
+    const anchor = placementsRef.current.find((piece) => piece.id === held.id)
+    if (!anchor) return next
+    const rect = viewport.getBoundingClientRect()
+    const cursorX = held.clientX - rect.left
+    const cursorY = held.clientY - rect.top
+    const screenX = (anchor.x + savedGrabX) * next.zoom + next.x
+    const screenY = (anchor.y + savedGrabY) * next.zoom + next.y
+    const errX = screenX - cursorX
+    const errY = screenY - cursorY
+    if (Math.hypot(errX, errY) <= 0.75) return next
+    held.grabX = savedGrabX
+    held.grabY = savedGrabY
+    return { ...next, x: next.x - errX, y: next.y - errY }
+  }
+
   function endPan(event: React.PointerEvent<HTMLDivElement>) {
     const pan = panRef.current
     if (!pan || pan.pointerId !== event.pointerId) return
+    stopPan()
+  }
+
+  function stopPan() {
     panRef.current = null
+    cancelAnimationFrame(stickFrameRef.current)
+    stickFrameRef.current = 0
     setPanning(false)
+    setPanStick(null)
   }
 
   function onViewportPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (pinchActiveRef.current || dragRef.current) return
+    if (pinchActiveRef.current) return
     if (event.button !== 0 && event.button !== 1) return
+    const drag = dragRef.current
+    if (drag?.pointerId === event.pointerId) return
+    const rect = viewportRef.current?.getBoundingClientRect() ?? null
+    const thumbs = twoThumbNow(rect)
+    if (drag && !thumbs) return
+    if (panRef.current) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
+    userAdjustedRef.current = true
+    if (thumbs && rect) {
+      const localX = event.clientX - rect.left
+      const localY = event.clientY - rect.top
+      const side = thumbSide(localX, rect.width)
+      panRef.current = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        stick: true,
+        side,
+        disc: stickDisc(localX, localY, rect.width, rect.height, side),
+        fingerX: localX,
+        fingerY: localY,
+        last: 0,
+      }
+      publishPanStick()
+      setPanning(true)
+      pokeStickPan()
+      return
+    }
     panRef.current = {
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
+      stick: false,
+      side: null,
+      disc: null,
+      fingerX: 0,
+      fingerY: 0,
+      last: 0,
     }
-    userAdjustedRef.current = true
     setPanning(true)
   }
 
@@ -714,8 +988,16 @@ function PuzzleTable({
     const pan = panRef.current
     if (!pan || pan.pointerId !== event.pointerId) return
     if (event.buttons === 0) {
-      panRef.current = null
-      setPanning(false)
+      stopPan()
+      publishPointer(event.clientX, event.clientY)
+      return
+    }
+    if (pan.stick && pan.disc) {
+      const rect = viewportRef.current?.getBoundingClientRect()
+      if (!rect) return
+      pan.fingerX = event.clientX - rect.left
+      pan.fingerY = event.clientY - rect.top
+      publishPanStick()
       publishPointer(event.clientX, event.clientY)
       return
     }
@@ -746,6 +1028,15 @@ function PuzzleTable({
   ) {
     if (pinchActiveRef.current) return
     if (event.button !== 0) return
+    const held = dragRef.current
+    if (held && held.pointerId !== event.pointerId) {
+      const occupied = viewportRef.current?.getBoundingClientRect() ?? null
+      if (twoThumbNow(occupied)) {
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+    }
     const point = playPoint(event)
     const placement = placementsRef.current.find((piece) => piece.id === id)
     if (!point || !placement) return
@@ -757,8 +1048,15 @@ function PuzzleTable({
         .filter((piece) => piece.group === placement.group)
         .map((piece) => piece.id),
     )
+    const rect = viewportRef.current?.getBoundingClientRect() ?? null
+    const thumb =
+      rect && twoThumbNow(rect)
+        ? thumbSide(event.clientX - rect.left, rect.width)
+        : null
     const cruise =
-      event.pointerType === 'touch' && window.matchMedia(MOBILE_LAYOUT).matches
+      thumb !== null ||
+      (event.pointerType === 'touch' &&
+        window.matchMedia(MOBILE_LAYOUT).matches)
     dragRef.current = {
       pointerId: event.pointerId,
       id,
@@ -769,6 +1067,8 @@ function PuzzleTable({
       cruise,
       clientX: event.clientX,
       clientY: event.clientY,
+      thumb,
+      handoverSince: null,
     }
     if (cruise) beginCruise(event.clientX, event.clientY)
     setFrontGroup(placement.group)
@@ -791,6 +1091,7 @@ function PuzzleTable({
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
     if (dragRef.current?.cruise) pokeCruise()
+    if (dragRef.current) syncHandover(dragRef.current)
   }
 
   function moveDragTo(clientX: number, clientY: number): boolean {
@@ -895,8 +1196,16 @@ function PuzzleTable({
   function cruiseTick(now: number) {
     cruiseFrameRef.current = 0
     const cruise = cruiseRef.current
-    if (!cruise || pinchActiveRef.current || panRef.current) {
+    if (!cruise || pinchActiveRef.current) {
       cruiseRef.current = null
+      showCruiseStick(null)
+      return
+    }
+    // A direct grab of the table cancels edge cruise. A thumb stick keeps
+    // the held piece and takes the camera for itself.
+    if (panRef.current && !panRef.current.stick) {
+      cruiseRef.current = null
+      showCruiseStick(null)
       return
     }
     const viewport = viewportRef.current
@@ -910,18 +1219,25 @@ function PuzzleTable({
     const dt = Math.min(0.05, Math.max(0, (now - cruise.lastTime) / 1000))
     cruise.lastTime = now
     const drag = dragRef.current
-    if (!drag?.cruise) {
+    const stickOwnsCamera = panRef.current?.stick === true
+    if (stickOwnsCamera) {
+      cruise.body = { speed: 0, heading: cruise.body.heading, accel: 0 }
+    }
+    if (!drag?.cruise || stickOwnsCamera) {
+      showCruiseStick(null)
+      if (drag?.cruise && stickOwnsCamera) {
+        pokeCruise()
+        return
+      }
       if (easeCruiseZoom(cruise, current, viewport, dt)) {
         cruiseRef.current = null
       } else pokeCruise()
       return
     }
     const rect = viewport.getBoundingClientRect()
-    const bounds = touchEdgeBounds(isExpanded(), rect)
-    const margin = cruiseMargin(
-      bounds.right - bounds.left,
-      bounds.bottom - bounds.top,
-    )
+    const full = touchEdgeBounds(isExpanded(), rect)
+    const margin = cruiseMargin(full.right - full.left, full.bottom - full.top)
+    const bounds = drag.thumb ? halfEdgeBounds(full, drag.thumb) : full
     const pull = edgePull(
       drag.clientX,
       drag.clientY,
@@ -929,6 +1245,7 @@ function PuzzleTable({
       margin,
       CRUISE_MAX_SPEED,
     )
+    showCruiseStick(cruiseStickView(drag, rect, pull))
     const body = stepCruise(cruise.body, pull, dt)
     cruise.body = body
     const velocity = cruiseVelocity(body)
@@ -1141,7 +1458,51 @@ function PuzzleTable({
           {messages.play.back}
         </button>
         <FullscreenButton className="play-mode__fullscreen" />
+        {panStick ? <ThumbStick stick={panStick} /> : null}
+        {cruiseStick ? <ThumbStick stick={cruiseStick} /> : null}
+        {handover ? (
+          <div
+            className="thumb-handover"
+            style={{ left: handover.x, top: handover.y }}
+            role="status"
+            aria-label={
+              handover.marks === '>>>'
+                ? messages.play.handoverRight
+                : messages.play.handoverLeft
+            }
+          >
+            {handover.marks}
+          </div>
+        ) : null}
       </div>
+    </div>
+  )
+}
+
+function ThumbStick({ stick }: { stick: ThumbStickView }) {
+  const halfStyle: React.CSSProperties =
+    stick.side === 'left'
+      ? { left: 10, width: 'calc(50% - 20px)' }
+      : { left: 'calc(50% + 10px)', width: 'calc(50% - 20px)' }
+  return (
+    <div className="thumb-stick" aria-hidden="true">
+      <div className="thumb-stick__half" style={halfStyle} />
+      <svg className="thumb-stick__arm">
+        <line x1={stick.cx} y1={stick.cy} x2={stick.knobX} y2={stick.knobY} />
+      </svg>
+      <div
+        className="thumb-stick__range"
+        style={{
+          left: stick.cx,
+          top: stick.cy,
+          width: stick.radius * 2,
+          height: stick.radius * 2,
+        }}
+      />
+      <div
+        className="thumb-stick__knob"
+        style={{ left: stick.knobX, top: stick.knobY }}
+      />
     </div>
   )
 }
@@ -1280,6 +1641,23 @@ interface Drag {
   cruise: boolean
   clientX: number
   clientY: number
+  thumb: ThumbSide | null
+  handoverSince: number | null
+}
+
+interface ThumbStickView {
+  side: ThumbSide
+  cx: number
+  cy: number
+  radius: number
+  knobX: number
+  knobY: number
+}
+
+interface HandoverView {
+  marks: HandoverMarks
+  x: number
+  y: number
 }
 
 interface ActiveCruise {
@@ -1294,6 +1672,12 @@ interface Pan {
   pointerId: number
   x: number
   y: number
+  stick: boolean
+  side: ThumbSide | null
+  disc: StickDisc | null
+  fingerX: number
+  fingerY: number
+  last: number
 }
 
 interface ScreenPoint {

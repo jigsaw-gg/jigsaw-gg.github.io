@@ -111,6 +111,8 @@ export interface Messages {
     back: string
     piece: (row: number, col: number) => string
     pointer: (name: string) => string
+    handoverRight: string
+    handoverLeft: string
   }
   errors: {
     appKeyMissing: string

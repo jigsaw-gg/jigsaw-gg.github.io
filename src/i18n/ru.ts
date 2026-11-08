@@ -129,6 +129,8 @@ export const ru: Messages = {
     back: 'Назад',
     piece: (row, col) => `Деталь ${row}-${col}`,
     pointer: (name) => `Указатель игрока ${name}`,
+    handoverRight: 'Деталь переходит к правому большому пальцу',
+    handoverLeft: 'Деталь переходит к левому большому пальцу',
   },
   errors: {
     appKeyMissing: 'Ключ приложения не задан.',

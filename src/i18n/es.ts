@@ -120,6 +120,8 @@ export const es: Messages = {
     back: 'Volver',
     piece: (row, col) => `Pieza ${row}-${col}`,
     pointer: (name) => `Puntero de ${name}`,
+    handoverRight: 'La pieza pasa al pulgar derecho',
+    handoverLeft: 'La pieza pasa al pulgar izquierdo',
   },
   errors: {
     appKeyMissing: 'La clave de la app no está configurada.',
