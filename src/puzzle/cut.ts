@@ -147,51 +147,46 @@ interface RazorEdge {
   points: LocalPoint[]
 }
 
-interface TurnPhase {
-  ds: number
-  omega: number
-}
+// Share of the shorter cell side given to every dip outline. Chosen so a
+// round dip is about 1.7× the previous median knob, in both width and depth.
+const DIP_BORDER = 0.954
+const DIP_STEPS = 210
 
 function razorCut(rng: () => number, length: number, cross: number): RazorEdge {
   if (!(length > 0) || !(cross > 0)) return flatEdge(Math.max(0, length))
-  const gentle = rng() < 0.5 ? rng() * 0.22 : 0.62 + rng() * 0.38
   const sign = rng() < 0.5 ? -1 : 1
-  const tab = cutManeuver(rng, gentle)
-  const spanNat = tab[tab.length - 1]?.along ?? 0
-  let depthNat = 0
-  for (const point of tab) depthNat = Math.max(depthNat, point.lat)
-  if (!(spanNat > 1e-3) || !(depthNat > 1e-3)) return flatEdge(length)
+  const reach = Math.min(length, cross)
+  const border = reach * DIP_BORDER
+  const tab = traceDip(sampleDip(rng))
+  rotateAboutCenter(tab, (rng() - 0.5) * 0.08)
+  pinEnds(tab)
+  scaleToArc(tab, border)
+  const origin = tab[0]?.along ?? 0
+  const tip = tab[tab.length - 1]?.along ?? border
+  for (const point of tab) point.along -= origin
+  const span = tip - origin
+  if (!(span > 1e-3)) return flatEdge(length)
 
-  const spanWant = length * mix(0.15, 0.36, gentle) * (0.9 + rng() * 0.16)
-  let scale = spanWant / spanNat
-  const depthCap = cross * mix(0.17, 0.25, gentle) * (0.94 + rng() * 0.1)
-  if (depthNat * scale > depthCap) scale = depthCap / depthNat
-  const pad = length * 0.3
-  const guard = length * 0.045
-  let span = spanNat * scale
-  const spanRoom = Math.max(length * 0.12, length - 2 * (pad + guard))
-  if (span > spanRoom) {
-    scale *= spanRoom / span
-    span = spanRoom
+  let minAlong = Infinity
+  let maxAlong = -Infinity
+  for (const point of tab) {
+    minAlong = Math.min(minAlong, point.along)
+    maxAlong = Math.max(maxAlong, point.along)
   }
-  const startMin = pad + guard
-  const startMax = Math.max(startMin, length - pad - guard - span)
-  const start = startMin + rng() * (startMax - startMin)
-
+  const box = Math.max(1e-6, maxAlong - minAlong)
+  const inset = Math.min(reach * 0.18, Math.max(0, (length - box) / 2))
+  const slack = Math.max(0, length - box - 2 * inset)
+  const play = slack * 0.4
+  const start = inset - minAlong + (slack - play) / 2 + rng() * play
   const hand = handLine(rng, length, cross)
-  const scaled = tab.map((point) => ({
-    along: point.along * scale,
-    lat: point.lat * scale,
-  }))
   const placed = seatTab(
-    scaled,
+    tab,
     start,
     span,
-    latOn(hand, start),
-    latOn(hand, Math.min(length, start + span)),
+    latOn(hand, clamp(start, 0, length)),
+    latOn(hand, clamp(start + span, 0, length)),
     sign,
   )
-  fitAlong(placed, length, pad)
   const open = placed[0]?.along ?? start
   const close = placed[placed.length - 1]?.along ?? start + span
   const points: LocalPoint[] = []
@@ -203,64 +198,141 @@ function razorCut(rng: () => number, length: number, cross: number): RazorEdge {
   return { depth, points }
 }
 
-// Dip to +lat while traveling forward. Heading is measured from forward,
-// positive toward the dip. The opposite side mirrors the whole path.
-// 1. slow turn toward the dip
-// 2. swift hook further in, carving the near lobe of the neck
-// 3. long turn the other way around the round dip
-// 4. swift hook out of the far lobe, then ease back onto the line
-function cutManeuver(rng: () => number, gentle: number): LocalPoint[] {
-  const vary = (spread: number) => 1 + (rng() - 0.5) * spread
-  const beta = mix(2.45, 2.05, gentle) * vary(0.08)
-  const shoulder = Math.min(beta * 0.45, mix(0.3, 0.58, gentle) * vary(0.14))
-  const rBowl = mix(0.32, 1.5, gentle) * vary(0.2)
-  const rHook = mix(0.09, 0.48, gentle) * vary(0.22)
-  const rSlow = mix(0.46, 1.7, gentle) * vary(0.2)
-  const bowlSide = 0.86 + rng() * 0.3
-  const hookSide = 0.86 + rng() * 0.3
-  const rise = Math.max(0.05, beta - shoulder)
-  const phases: TurnPhase[] = [
-    { ds: rSlow * shoulder, omega: 1 / rSlow },
-    { ds: rHook * rise, omega: 1 / rHook },
-    { ds: rBowl * beta, omega: -1 / rBowl },
-    { ds: rBowl * bowlSide * beta, omega: -1 / (rBowl * bowlSide) },
-    { ds: rHook * hookSide * rise, omega: 1 / (rHook * hookSide) },
-    { ds: rSlow * shoulder, omega: 1 / rSlow },
-  ]
-  const step = Math.min(rHook, rBowl, rSlow) / 7
-  const points: LocalPoint[] = [{ along: 0, lat: 0 }]
+interface DipShape {
+  alphaIn: number
+  alphaOut: number
+  entryFrac: number
+  exitFrac: number
+  entryPower: number
+  exitPower: number
+  bowlShape: number
+  bowlBias: number
+  sharp: number
+  floor: number
+  ripple: number
+  rippleFreq: number
+  ripplePhase: number
+}
+
+// One border length, bent different ways. Curvature is positive while the
+// razor turns toward the dip (slowly, then more tightly), negative for the
+// single sweep around the bowl, then positive again on the way out. The
+// second derivative — how that turn tightens and eases — is what changes
+// a round knob into a pear or a thin deep one.
+function sampleDip(rng: () => number): DipShape {
+  const roll = rng()
+  let stretch: number
+  let neck: number
+  let bias: number
+  let skew: number
+  if (roll < 0.3) {
+    stretch = rng() * 0.08
+    neck = rng()
+    bias = (rng() - 0.5) * 0.2
+    skew = (rng() - 0.5) * 0.3
+  } else if (roll < 0.55) {
+    stretch = 0.84 + rng() * 0.16
+    neck = 0
+    bias = (rng() - 0.5) * 0.22
+    skew = (rng() - 0.5) * 0.28
+  } else if (roll < 0.76) {
+    stretch = 0.36 + rng() * 0.24
+    neck = rng() * 0.2
+    bias = (rng() - 0.5) * 0.4
+    skew = (rng() - 0.5) * 0.5
+  } else {
+    stretch = 0.58 + rng() * 0.22
+    neck = 0
+    bias = (rng() < 0.5 ? -1 : 1) * (0.5 + rng() * 0.35)
+    skew = (rng() < 0.5 ? -1 : 1) * (0.3 + rng() * 0.35)
+  }
+  const ease = stretch * stretch * (3 - 2 * stretch)
+  const alpha = lerp(2.42, 1.48, ease)
+  const skewScale = 1 + skew * 0.14
+  const roundBowl = -0.72 * neck
+  return {
+    alphaIn: alpha * skewScale,
+    alphaOut: alpha / skewScale,
+    entryFrac: clamp(lerp(0.105, 0.055, ease) * (1 - skew * 0.08), 0.048, 0.16),
+    exitFrac: clamp(lerp(0.105, 0.055, ease) * (1 + skew * 0.08), 0.048, 0.16),
+    entryPower: lerp(1.2, 1.55, ease),
+    exitPower: lerp(1.2, 1.55, ease),
+    bowlShape: lerp(roundBowl, 0.992, ease),
+    bowlBias: bias,
+    sharp: lerp(0.18, 0.058, ease),
+    floor: lerp(neck > 0.3 ? 0.06 : 0.32, 0.001, ease),
+    ripple: rng() * 0.35,
+    rippleFreq: rng() < 0.65 ? 1 : 2,
+    ripplePhase: rng() * Math.PI * 2,
+  }
+}
+
+function traceDip(shape: DipShape): LocalPoint[] {
+  const sIn = shape.entryFrac
+  const sOut = shape.exitFrac
+  const sBowl = 1 - sIn - sOut
+  const entryNorm = shape.entryPower + 1
+  const exitNorm = shape.exitPower + 1
+  const bowlSamples = 180
+  const bowl: number[] = []
+  let bowlIntegral = 0
+  for (let index = 0; index < bowlSamples; index += 1) {
+    const t = (index + 0.5) / bowlSamples
+    let density = bowlDensity(t, shape)
+    density *=
+      1 +
+      shape.ripple *
+        Math.sin(Math.PI * 2 * shape.rippleFreq * t + shape.ripplePhase)
+    density = Math.max(shape.floor * 0.35, density)
+    bowl.push(density)
+    bowlIntegral += density
+  }
+  bowlIntegral /= bowlSamples
+  const bowlAngle = -(shape.alphaIn + shape.alphaOut)
+  const points: LocalPoint[] = []
   let along = 0
   let lat = 0
   let theta = 0
-  for (const phase of phases) {
-    const steps = Math.max(4, Math.round(phase.ds / step))
-    const ds = phase.ds / steps
-    for (let index = 0; index < steps; index += 1) {
-      theta += phase.omega * ds
-      along += Math.cos(theta) * ds
-      lat += Math.sin(theta) * ds
-      points.push({ along, lat })
+  const ds = 1 / DIP_STEPS
+  for (let index = 0; index <= DIP_STEPS; index += 1) {
+    points.push({ along, lat })
+    if (index === DIP_STEPS) break
+    const s = (index + 0.5) * ds
+    let kappa: number
+    if (s < sIn) {
+      kappa =
+        ((shape.alphaIn * entryNorm) / sIn) *
+        Math.pow(s / sIn, shape.entryPower)
+    } else if (s < sIn + sBowl) {
+      const t = (s - sIn) / sBowl
+      const sample =
+        bowl[Math.min(bowlSamples - 1, Math.floor(t * bowlSamples))] ?? 1
+      kappa = (bowlAngle / sBowl) * (sample / bowlIntegral)
+    } else {
+      const t = (s - sIn - sBowl) / sOut
+      kappa =
+        ((shape.alphaOut * exitNorm) / sOut) * Math.pow(1 - t, shape.exitPower)
     }
+    theta += kappa * ds
+    along += Math.cos(theta) * ds
+    lat += Math.sin(theta) * ds
   }
-  pinEnds(points)
-  rotateAboutCenter(points, (rng() - 0.5) * mix(0.1, 0.06, gentle))
-  pinEnds(points)
-  const count = points.length - 1
-  const span = points[count]?.along || 1
-  const tip = points.reduce((max, point) => Math.max(max, point.lat), 0) || 1
-  const amp = tip * (0.03 + rng() * 0.04)
-  const freq = 1.3 + rng() * 2.4
-  const phase = rng() * Math.PI * 2
-  const alongAmp = span * (0.012 + rng() * 0.02)
-  for (let index = 0; index <= count; index += 1) {
-    const u = index / count
-    const env = Math.sin(Math.PI * u)
-    points[index].lat += Math.sin(freq * Math.PI * u + phase) * amp * env
-    points[index].along +=
-      Math.sin(freq * Math.PI * u + phase + 1.7) * alongAmp * env
-  }
-  pinEnds(points)
+  scaleToArc(points, 1)
   return points
+}
+
+function bowlDensity(t: number, shape: DipShape): number {
+  const center = clamp(0.5 + shape.bowlBias * 0.28, 0.18, 0.82)
+  const peak = Math.exp(-((t - center) ** 2) / (2 * shape.sharp * shape.sharp))
+  const endSpread = 2 * 0.09 * 0.09
+  const ends =
+    0.55 *
+    (Math.exp(-(t * t) / endSpread) + Math.exp(-((t - 1) ** 2) / endSpread))
+  const raw =
+    shape.bowlShape >= 0
+      ? 1 - shape.bowlShape + shape.bowlShape * peak
+      : 1 + shape.bowlShape + -shape.bowlShape * ends
+  return Math.max(shape.floor, raw)
 }
 
 function handLine(
@@ -301,7 +373,7 @@ function handLine(
   }
   points[0] = { along: 0, lat: 0 }
   points[count] = { along: length, lat: 0 }
-  const cap = Math.min(length, cross) * 0.07
+  const cap = Math.min(length, cross) * 0.04
   let peak = 0
   for (const point of points) peak = Math.max(peak, Math.abs(point.lat))
   if (peak > cap) {
@@ -309,28 +381,6 @@ function handLine(
     for (const point of points) point.lat *= scale
   }
   return points
-}
-
-function fitAlong(points: LocalPoint[], length: number, pad: number): void {
-  let min = Infinity
-  let max = -Infinity
-  for (const point of points) {
-    min = Math.min(min, point.along)
-    max = Math.max(max, point.along)
-  }
-  const lo = pad
-  const hi = length - pad
-  const span = Math.max(1e-6, max - min)
-  const room = Math.max(1e-6, hi - lo)
-  const scale = Math.min(1, room / span)
-  const mid = (min + max) / 2
-  const half = (span * scale) / 2
-  let center = mid
-  if (center - half < lo) center = lo + half
-  if (center + half > hi) center = hi - half
-  for (const point of points) {
-    point.along = center + (point.along - mid) * scale
-  }
 }
 
 function seatTab(
@@ -411,8 +461,27 @@ function flatEdge(length: number): RazorEdge {
   }
 }
 
-function mix(thin: number, wide: number, gentle: number): number {
-  return thin + (wide - thin) * gentle
+function scaleToArc(points: LocalPoint[], arc: number): void {
+  let length = 0
+  for (let index = 1; index < points.length; index += 1) {
+    const prev = points[index - 1]
+    const point = points[index]
+    length += Math.hypot(point.along - prev.along, point.lat - prev.lat)
+  }
+  if (!(length > 1e-8)) return
+  const scale = arc / length
+  for (const point of points) {
+    point.along *= scale
+    point.lat *= scale
+  }
+}
+
+function lerp(from: number, to: number, t: number): number {
+  return from + (to - from) * t
+}
+
+function clamp(value: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, value))
 }
 
 function placeCut(
