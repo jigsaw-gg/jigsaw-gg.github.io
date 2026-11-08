@@ -183,11 +183,21 @@ function PuzzleTable({
     () => playArea(layout.playW, layout.playH),
     [layout.playW, layout.playH],
   )
-  const opening = useMemo(
-    () =>
-      pieceBounds(layout.placements, layout.cellW, layout.cellH, layout.pad),
-    [layout],
-  )
+  const opening = useMemo(() => {
+    const pieces = pieceBounds(
+      layout.placements,
+      layout.cellW,
+      layout.cellH,
+      layout.pad,
+    )
+    const { reserve } = layout
+    return {
+      minX: Math.min(pieces.minX, reserve.minX),
+      minY: Math.min(pieces.minY, reserve.minY),
+      maxX: Math.max(pieces.maxX, reserve.maxX),
+      maxY: Math.max(pieces.maxY, reserve.maxY),
+    }
+  }, [layout])
   const [view, setView] = useState<Camera>(() =>
     fitCamera(window.innerWidth, window.innerHeight, opening, 0),
   )

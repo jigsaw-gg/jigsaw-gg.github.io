@@ -3,6 +3,7 @@ import { mixSeed, mulberry32 } from './random.ts'
 
 const SLOT_GAP = 0.28 * 2
 const SLOT_JITTER = 0.08
+const RESERVE_RATIO = 16 / 9
 const SCATTER_SALT = 81_001
 const HIGHLIGHT_FRACTION = 0.1
 const SNAP_FRACTION = 0.05
@@ -32,6 +33,8 @@ export interface ScatteredBoard {
   cellH: number
   pad: number
   placements: Placement[]
+  /** Image-sized 16:9 clearing left empty in the center. */
+  reserve: Bounds
 }
 
 export interface NearPair {
@@ -43,6 +46,149 @@ export function pieceId(col: number, row: number): string {
   return `${col}:${row}`
 }
 
+interface Slot {
+  x: number
+  y: number
+}
+
+/**
+ * Columns and rows of the one-piece frame around the centered reserve.
+ * Corners belong to the top and bottom rows. The pitch stays at least the
+ * scatter gap, and any leftover span is shared so the corners keep that gap
+ * from the reserve.
+ */
+function innerFrame(
+  reserveW: number,
+  reserveH: number,
+  cellW: number,
+  cellH: number,
+  gapX: number,
+  gapY: number,
+): { xs: number[]; ys: number[] } {
+  const slotW = cellW + gapX
+  const slotH = cellH + gapY
+  const insetX = reserveW / 2 + gapX
+  const insetY = reserveH / 2 + gapY
+  const leftX = -insetX - cellW
+  const rightX = insetX
+  const topY = -insetY - cellH
+  const bottomY = insetY
+  const spanW = rightX + cellW - leftX
+  const countX = Math.max(2, Math.floor((spanW + gapX) / slotW))
+  const extraX = Math.max(0, spanW - (countX * cellW + (countX - 1) * gapX))
+  const pitchX = cellW + gapX + extraX / (countX - 1)
+  const xs: number[] = []
+  for (let index = 0; index < countX; index += 1) {
+    xs.push(leftX + index * pitchX)
+  }
+
+  const sideTop = topY + cellH + gapY
+  const sideSpan = bottomY - gapY - sideTop
+  const countY = Math.floor((sideSpan + gapY) / slotH)
+  const ys = [topY]
+  if (countY > 0) {
+    const extraY = Math.max(
+      0,
+      sideSpan - (countY * cellH + (countY - 1) * gapY),
+    )
+    const pitchY = countY === 1 ? 0 : cellH + gapY + extraY / (countY - 1)
+    const offsetY = countY === 1 ? extraY / 2 : 0
+    for (let index = 0; index < countY; index += 1) {
+      ys.push(sideTop + offsetY + index * pitchY)
+    }
+  }
+  ys.push(bottomY)
+  return { xs, ys }
+}
+
+/** Center, then the cell left of it, then the cell right of it, and outward. */
+function centerOut(values: number[]): number[] {
+  const mid = (values.length - 1) / 2
+  return values
+    .map((value, index) => ({ value, index, dist: Math.abs(index - mid) }))
+    .sort((a, b) => a.dist - b.dist || a.index - b.index)
+    .map((entry) => entry.value)
+}
+
+function place(slots: Slot[], count: number, x: number, y: number): boolean {
+  if (slots.length >= count) return false
+  slots.push({ x, y })
+  return true
+}
+
+/**
+ * Seats for pieces taken in shuffle order.
+ * The first seats trace the one-piece frame around the reserve. After that
+ * frame is full, pieces grow it: the new left and right columns from top to
+ * bottom, then the row above from the center outward, then the row below.
+ */
+function slotsAroundReserve(
+  count: number,
+  reserveW: number,
+  reserveH: number,
+  cellW: number,
+  cellH: number,
+  gapX: number,
+  gapY: number,
+): Slot[] {
+  if (count <= 0) return []
+  const frame = innerFrame(reserveW, reserveH, cellW, cellH, gapX, gapY)
+  const topY = frame.ys[0]
+  const bottomY = frame.ys[frame.ys.length - 1]
+  const leftX = frame.xs[0]
+  const rightX = frame.xs[frame.xs.length - 1]
+  if (
+    topY === undefined ||
+    bottomY === undefined ||
+    leftX === undefined ||
+    rightX === undefined
+  ) {
+    return []
+  }
+  const slots: Slot[] = []
+  for (const x of frame.xs) {
+    if (!place(slots, count, x, topY)) return slots
+  }
+  for (let index = 1; index < frame.ys.length - 1; index += 1) {
+    const y = frame.ys[index]
+    if (y === undefined || !place(slots, count, rightX, y)) return slots
+  }
+  for (let index = frame.xs.length - 1; index >= 0; index -= 1) {
+    const x = frame.xs[index]
+    if (x === undefined || !place(slots, count, x, bottomY)) return slots
+  }
+  for (let index = frame.ys.length - 2; index >= 1; index -= 1) {
+    const y = frame.ys[index]
+    if (y === undefined || !place(slots, count, leftX, y)) return slots
+  }
+
+  let xs = frame.xs
+  let ys = frame.ys
+  for (let guard = 0; slots.length < count; guard += 1) {
+    if (guard > count) {
+      throw new Error('could not place every piece around the center')
+    }
+    const outerLeft = (xs[0] ?? 0) - (cellW + gapX)
+    const outerRight = (xs[xs.length - 1] ?? 0) + (cellW + gapX)
+    for (const y of ys) {
+      if (!place(slots, count, outerLeft, y)) return slots
+      if (!place(slots, count, outerRight, y)) return slots
+    }
+    xs = [outerLeft, ...xs, outerRight]
+    const aboveY = (ys[0] ?? 0) - (cellH + gapY)
+    for (const x of centerOut(xs)) {
+      if (!place(slots, count, x, aboveY)) return slots
+    }
+    ys = [aboveY, ...ys]
+    const belowY = (ys[ys.length - 1] ?? 0) + (cellH + gapY)
+    for (const x of centerOut(xs)) {
+      if (!place(slots, count, x, belowY)) return slots
+    }
+    ys = [...ys, belowY]
+  }
+  return slots
+}
+
 export function scatterPieces(
   model: PuzzleModel,
   seed: number,
@@ -50,13 +196,36 @@ export function scatterPieces(
   const { cols, rows, cellW, cellH, pad, pieces } = model
   const gapX = cellW * SLOT_GAP
   const gapY = cellH * SLOT_GAP
-  const slotW = cellW + gapX
-  const slotH = cellH + gapY
   const marginX = pad + cellW * (SLOT_JITTER / 2)
   const marginY = pad + cellH * (SLOT_JITTER / 2)
-  const playW = marginX * 2 + cols * cellW + Math.max(0, cols - 1) * gapX
-  const playH = marginY * 2 + rows * cellH + Math.max(0, rows - 1) * gapY
+  // Same area as the source image, left empty as a 16:9 center.
+  const imageArea = Math.max(1, cols * cellW * rows * cellH)
+  const reserveW = Math.sqrt(imageArea * RESERVE_RATIO)
+  const reserveH = reserveW / RESERVE_RATIO
   const rng = mulberry32(mixSeed(seed >>> 0, SCATTER_SALT))
+  const around = slotsAroundReserve(
+    pieces.length,
+    reserveW,
+    reserveH,
+    cellW,
+    cellH,
+    gapX,
+    gapY,
+  )
+  let minX = -reserveW / 2
+  let minY = -reserveH / 2
+  let maxX = reserveW / 2
+  let maxY = reserveH / 2
+  for (const slot of around) {
+    minX = Math.min(minX, slot.x)
+    minY = Math.min(minY, slot.y)
+    maxX = Math.max(maxX, slot.x + cellW)
+    maxY = Math.max(maxY, slot.y + cellH)
+  }
+  const shiftX = marginX - minX
+  const shiftY = marginY - minY
+  const playW = maxX - minX + marginX * 2
+  const playH = maxY - minY + marginY * 2
   const order = pieces.map((piece) => pieceId(piece.col, piece.row))
   for (let index = order.length - 1; index > 0; index -= 1) {
     const swap = Math.floor(rng() * (index + 1))
@@ -77,21 +246,32 @@ export function scatterPieces(
   const slotOf = new Map(order.map((id, index) => [id, index]))
   const placements = pieces.map((piece) => {
     const id = pieceId(piece.col, piece.row)
-    const slot = slotOf.get(id) ?? 0
-    const slotCol = slot % cols
-    const slotRow = Math.floor(slot / cols)
+    const slot = around[slotOf.get(id) ?? 0]
     const jitterX = (rng() - 0.5) * cellW * SLOT_JITTER
     const jitterY = (rng() - 0.5) * cellH * SLOT_JITTER
     return {
       id,
       col: piece.col,
       row: piece.row,
-      x: marginX + slotCol * slotW + jitterX,
-      y: marginY + slotRow * slotH + jitterY,
+      x: (slot?.x ?? 0) + shiftX + jitterX,
+      y: (slot?.y ?? 0) + shiftY + jitterY,
       group: id,
     }
   })
-  return { playW, playH, cellW, cellH, pad, placements }
+  return {
+    playW,
+    playH,
+    cellW,
+    cellH,
+    pad,
+    placements,
+    reserve: {
+      minX: -reserveW / 2 + shiftX,
+      minY: -reserveH / 2 + shiftY,
+      maxX: reserveW / 2 + shiftX,
+      maxY: reserveH / 2 + shiftY,
+    },
+  }
 }
 
 export function approachLimits(
