@@ -172,7 +172,7 @@ function startApinator(client: RealtimeClient): void {
   })
 
   channel.bind(APINATOR_EVENT, (data) => {
-    console.log('Received:', data)
+    if (import.meta.env.DEV) console.log('Received:', data)
     const record: ApinatorEventRecord = {
       id: nextEventId,
       at: new Date().toISOString(),

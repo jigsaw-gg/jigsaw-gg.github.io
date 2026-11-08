@@ -125,6 +125,7 @@ export const es: Messages = {
     pointer: (name) => `Puntero de ${name}`,
     handoverRight: 'La pieza pasa al pulgar derecho',
     handoverLeft: 'La pieza pasa al pulgar izquierdo',
+    gamepad: 'Mando conectado',
   },
   errors: {
     appKeyMissing: 'La clave de la app no está configurada.',

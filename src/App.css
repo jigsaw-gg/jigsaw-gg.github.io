@@ -725,7 +725,15 @@ html:has(.embedded-safari) .play-mode {
 }
 
 .field input:focus-visible,
-.button:focus-visible {
+.button:focus-visible,
+.button.gamepad-focused,
+a.gamepad-focused,
+input.gamepad-focused,
+select.gamepad-focused,
+textarea.gamepad-focused,
+.gallery__choice.gamepad-focused,
+.theme-switcher__option.gamepad-focused,
+.language-dialog__option.gamepad-focused {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -1076,6 +1084,68 @@ html:has(.embedded-safari) .play-mode {
 
 .piece--dragging {
   cursor: grabbing;
+}
+
+.piece--pad {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.piece--pad-hover {
+  outline: 2px dashed color-mix(in srgb, var(--accent) 75%, transparent);
+  outline-offset: 2px;
+}
+
+.gamepad-pointer {
+  position: absolute;
+  z-index: 7;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: -0.675rem 0 0 -0.675rem;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 80%, white);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+
+.gamepad-pointer--hot {
+  background: color-mix(in srgb, var(--accent) 48%, transparent);
+  border-color: var(--accent);
+}
+
+.gamepad-blink {
+  position: absolute;
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--accent);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.28);
+  pointer-events: none;
+  animation: gamepad-blink 0.65s steps(2, end) infinite;
+}
+
+.gamepad-blink__icon {
+  width: 1.55rem;
+  height: 1.55rem;
+}
+
+@keyframes gamepad-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gamepad-blink {
+    animation: none;
+  }
 }
 
 .remote-cursor {

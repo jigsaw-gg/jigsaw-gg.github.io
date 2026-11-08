@@ -125,6 +125,7 @@ export const en: Messages = {
     pointer: (name) => `${name}'s pointer`,
     handoverRight: 'Passing the piece to the right thumb',
     handoverLeft: 'Passing the piece to the left thumb',
+    gamepad: 'Controller connected',
   },
   errors: {
     appKeyMissing: 'App key is not set.',

@@ -6,6 +6,8 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { browserLogPlugin } from './dev/browserLogPlugin.ts'
+import { lanHttpsOptions } from './dev/devHttps.ts'
 
 /**
  * GitHub Pages serves 404.html for unknown paths with status 404, which
@@ -279,14 +281,28 @@ export default defineConfig(({ mode }) => {
   const port = worktreeDevPort()
   const build = resolveBuildInfo()
   const telegram = resolveTelegramIdentity(mode)
+  const https = lanHttpsOptions()
+  const worktreeServer =
+    port === undefined
+      ? undefined
+      : { host: '127.0.0.1' as const, port, strictPort: true as const }
+  const server =
+    worktreeServer || https
+      ? {
+          ...(worktreeServer ?? {}),
+          ...(https ? { https } : {}),
+        }
+      : undefined
   return {
     // jigsaw-gg.github.io is served from the domain root.
     base: '/',
-    server:
-      port === undefined
-        ? undefined
-        : { host: '127.0.0.1', port, strictPort: true },
-    plugins: [react(), githubPagesSpaFallback(), apinatorAuthPlugin(mode)],
+    server,
+    plugins: [
+      react(),
+      githubPagesSpaFallback(),
+      apinatorAuthPlugin(mode),
+      browserLogPlugin(),
+    ],
     define: {
       'import.meta.env.VITE_APINATOR_APP_KEY': JSON.stringify(
         resolveAppKey(mode),

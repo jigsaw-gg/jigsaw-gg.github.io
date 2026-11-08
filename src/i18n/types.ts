@@ -116,6 +116,7 @@ export interface Messages {
     pointer: (name: string) => string
     handoverRight: string
     handoverLeft: string
+    gamepad: string
   }
   errors: {
     appKeyMissing: string

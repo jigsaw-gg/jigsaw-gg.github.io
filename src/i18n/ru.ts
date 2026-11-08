@@ -134,6 +134,7 @@ export const ru: Messages = {
     pointer: (name) => `Указатель игрока ${name}`,
     handoverRight: 'Деталь переходит к правому большому пальцу',
     handoverLeft: 'Деталь переходит к левому большому пальцу',
+    gamepad: 'Геймпад подключён',
   },
   errors: {
     appKeyMissing: 'Ключ приложения не задан.',

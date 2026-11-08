@@ -1,7 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { isExpanded } from '../fullscreen.ts'
+import { GAMEPAD_POINTER } from '../input/dualshock.ts'
+import { getState as getGamepadState } from '../input/gamepadHandler.ts'
 import { FullscreenButton } from './FullscreenButton.tsx'
 import { useI18n } from '../i18n/useI18n.ts'
+import {
+  PAN_SPEED_PX,
+  PIECE_SPEED_PX,
+  POINTER_SPEED_PX,
+  TRIGGER_ZOOM_PER_SEC,
+  VIEW_MARGIN,
+  boundsVisible,
+  cameraWithInterest,
+  groupAtWorld,
+  groupScreenCenter,
+  groupWorldBounds,
+  lookOffset,
+  pickGroupInDirection,
+  piecesVisible,
+  type PadDirection,
+} from '../puzzle/gamepadView.ts'
 import {
   CRUISE_MAX_SPEED,
   createCruise,
@@ -51,6 +69,10 @@ import { hapticImpact } from '../telegram/webApp.ts'
 
 /** Nearby-piece glow fade, in milliseconds. */
 const GLOW_MS = 260
+/** How long the controller blink stays up after input starts. */
+const GAMEPAD_BLINK_MS = 3000
+/** Stick must rest this long before a controller drag is saved. */
+const GAMEPAD_RELEASE_S = 0.12
 const MOBILE_LAYOUT = '(max-width: 1100px)'
 /**
  * Critically damped snap, in rad/s. The piece speeds up toward the join,
@@ -310,6 +332,23 @@ function PuzzleTable({
   )
   const [frontGroup, setFrontGroup] = useState<string | null>(null)
   const [dragGroup, setDragGroup] = useState<string | null>(null)
+  const [padGroup, setPadGroup] = useState<string | null>(null)
+  const [padHoverGroup, setPadHoverGroup] = useState<string | null>(null)
+  const [padPointer, setPadPointer] = useState<{
+    x: number
+    y: number
+  } | null>(null)
+  const [gamepadBlink, setGamepadBlink] = useState(false)
+  const [boardActive, setBoardActive] = useState(active)
+  if (boardActive !== active) {
+    setBoardActive(active)
+    if (!active) {
+      setPadGroup(null)
+      setPadHoverGroup(null)
+      setPadPointer(null)
+      setGamepadBlink(false)
+    }
+  }
   const [panning, setPanning] = useState(false)
   const [panStick, setPanStick] = useState<ThumbStickView | null>(null)
   const [cruiseStick, setCruiseStick] = useState<ThumbStickView | null>(null)
@@ -345,7 +384,29 @@ function PuzzleTable({
   const yieldSeen = useRef(yieldNonce)
   const publishPointerRef = useRef<(x: number, y: number) => void>(() => {})
   const viewRef = useRef(view)
+  const followRef = useRef(view)
   const dragRef = useRef<Drag | null>(null)
+  const padGroupRef = useRef<string | null>(null)
+  const padHoverRef = useRef<string | null>(null)
+  const padHoverIdRef = useRef<string | null>(null)
+  const padPointerRef = useRef<{ x: number; y: number } | null>(null)
+  const selectionRef = useRef<string | null>(null)
+  const interestRef = useRef({ x: 0, y: 0 })
+  const blinkRef = useRef(false)
+  const padClockRef = useRef({
+    last: 0,
+    l1: false,
+    r1: false,
+    up: false,
+    down: false,
+    leftPad: false,
+    rightPad: false,
+    idle: 0,
+    showUntil: 0,
+    latched: false,
+  })
+  const commitViewRef = useRef<(camera: Camera) => void>(() => {})
+  const gamepadTickRef = useRef<(now: number) => void>(() => {})
   const panRef = useRef<Pan | null>(null)
   const pinchActiveRef = useRef(false)
   const finishDragRef = useRef<(commit: boolean) => void>(() => {})
@@ -412,6 +473,8 @@ function PuzzleTable({
       const rect = viewport.getBoundingClientRect()
       if (rect.width < 2 || rect.height < 2) return
       const next = fitCamera(rect.width, rect.height, opening, 0)
+      interestRef.current = { x: 0, y: 0 }
+      followRef.current = next
       viewRef.current = next
       setView(next)
     }
@@ -429,6 +492,14 @@ function PuzzleTable({
       clearHandover()
       showCruiseStick(null)
       setDragGroup(null)
+      selectionRef.current = null
+      padGroupRef.current = null
+      padHoverRef.current = null
+      padPointerRef.current = null
+      setPadGroup(null)
+      setPadHoverGroup(null)
+      setPadPointer(null)
+      interestRef.current = { x: 0, y: 0 }
       setNear(null)
       offsetsRef.current.clear()
       setOffsets(new Map())
@@ -463,6 +534,15 @@ function PuzzleTable({
       stickFrameRef.current = 0
       window.clearTimeout(handoverTimerRef.current)
       handoverTimerRef.current = 0
+      if (dragRef.current?.pointerId === GAMEPAD_POINTER) {
+        finishDragRef.current(true)
+      }
+      selectionRef.current = null
+      padGroupRef.current = null
+      padHoverRef.current = null
+      padPointerRef.current = null
+      interestRef.current = { x: 0, y: 0 }
+      blinkRef.current = false
       onPointerGone()
     }
   }, [active, onPointerGone])
@@ -487,17 +567,21 @@ function PuzzleTable({
         area,
         Math.min(layout.cellW, layout.cellH),
       )
+      const follow = followRef.current
+      const cursorX = event.clientX - rect.left
+      const cursorY = event.clientY - rect.top
+      const worldX = (cursorX - current.x) / current.zoom
+      const worldY = (cursorY - current.y) / current.zoom
       const next = zoomCamera(
-        current,
-        event.clientX - rect.left,
-        event.clientY - rect.top,
+        follow,
+        worldX * follow.zoom + follow.x,
+        worldY * follow.zoom + follow.y,
         Math.exp(-delta * 0.0016),
         limits.min,
         limits.max,
       )
       userAdjustedRef.current = true
-      viewRef.current = next
-      setView(next)
+      commitViewRef.current(next)
       publishPointerRef.current(event.clientX, event.clientY)
     }
     viewport.addEventListener('wheel', onWheel, { passive: false })
@@ -520,10 +604,15 @@ function PuzzleTable({
         area,
         Math.min(layout.cellW, layout.cellH),
       )
+      const follow = followRef.current
+      const cursorX = prev.x - rect.left
+      const cursorY = prev.y - rect.top
+      const worldX = (cursorX - current.x) / current.zoom
+      const worldY = (cursorY - current.y) / current.zoom
       const zoomed = zoomCamera(
-        current,
-        prev.x - rect.left,
-        prev.y - rect.top,
+        follow,
+        worldX * follow.zoom + follow.x,
+        worldY * follow.zoom + follow.y,
         next.dist / prev.dist,
         limits.min,
         limits.max,
@@ -534,8 +623,7 @@ function PuzzleTable({
         y: zoomed.y + (next.y - prev.y),
       }
       userAdjustedRef.current = true
-      viewRef.current = camera
-      setView(camera)
+      commitViewRef.current(camera)
     }
 
     const onDown = (event: PointerEvent) => {
@@ -617,9 +705,60 @@ function PuzzleTable({
     }
   }, [area, layout])
 
+  function present(follow: Camera): Camera {
+    const interest = interestRef.current
+    const group = padGroupRef.current
+    const viewport = viewportRef.current
+    if (
+      !group ||
+      !viewport ||
+      Math.hypot(interest.x, interest.y) * Math.max(follow.zoom, 0) < 0.5
+    ) {
+      return follow
+    }
+    const rect = viewport.getBoundingClientRect()
+    if (
+      piecesVisible(
+        follow,
+        rect.width,
+        rect.height,
+        placementsRef.current,
+        layout.cellW,
+        layout.cellH,
+      )
+    ) {
+      return follow
+    }
+    const bounds = groupWorldBounds(
+      placementsRef.current,
+      group,
+      layout.cellW,
+      layout.cellH,
+    )
+    if (!bounds) return follow
+    const limits = cameraLimits(
+      rect.width,
+      rect.height,
+      area,
+      Math.min(layout.cellW, layout.cellH),
+    )
+    return cameraWithInterest(
+      follow,
+      bounds,
+      interest.x,
+      interest.y,
+      rect.width,
+      rect.height,
+      limits.min,
+      VIEW_MARGIN,
+    )
+  }
+
   function commitView(next: Camera) {
-    viewRef.current = next
-    setView(next)
+    followRef.current = next
+    const shown = present(next)
+    viewRef.current = shown
+    setView(shown)
   }
 
   function playPoint(event: { clientX: number; clientY: number }): {
@@ -662,12 +801,39 @@ function PuzzleTable({
 
   useEffect(() => {
     finishDragRef.current = finishDrag
+    commitViewRef.current = commitView
+    gamepadTickRef.current = gamepadTick
   })
 
   useEffect(() => {
     cruiseTickRef.current = cruiseTick
     stickTickRef.current = stickPanTick
   })
+
+  useEffect(() => {
+    if (!active) return
+    let frame = 0
+    let backup = 0
+    const loop = (now: number) => {
+      window.clearTimeout(backup)
+      gamepadTickRef.current(now)
+      frame = requestAnimationFrame(loop)
+      // A visible page paints every frame. If it does not, keep reading the pad.
+      backup = window.setTimeout(() => {
+        cancelAnimationFrame(frame)
+        loop(performance.now())
+      }, 50)
+    }
+    frame = requestAnimationFrame(loop)
+    backup = window.setTimeout(() => {
+      cancelAnimationFrame(frame)
+      loop(performance.now())
+    }, 50)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(backup)
+    }
+  }, [active])
 
   useEffect(() => {
     const onPageHide = () => {
@@ -1002,12 +1168,12 @@ function PuzzleTable({
       publishPointer(event.clientX, event.clientY)
       return
     }
-    const current = viewRef.current
-    if (!current) return
+    const follow = followRef.current
+    if (!follow) return
     const next = {
-      ...current,
-      x: current.x + (event.clientX - pan.x),
-      y: current.y + (event.clientY - pan.y),
+      ...follow,
+      x: follow.x + (event.clientX - pan.x),
+      y: follow.y + (event.clientY - pan.y),
     }
     pan.x = event.clientX
     pan.y = event.clientY
@@ -1041,6 +1207,15 @@ function PuzzleTable({
     const point = playPoint(event)
     const placement = placementsRef.current.find((piece) => piece.id === id)
     if (!point || !placement) return
+    if (dragRef.current?.pointerId === GAMEPAD_POINTER) finishDrag(true)
+    selectionRef.current = null
+    padGroupRef.current = null
+    padHoverRef.current = null
+    padPointerRef.current = null
+    interestRef.current = { x: 0, y: 0 }
+    setPadGroup(null)
+    setPadHoverGroup(null)
+    setPadPointer(null)
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -1102,6 +1277,21 @@ function PuzzleTable({
     if (!point) return false
     const rawX = point.x - drag.grabX
     const rawY = point.y - drag.grabY
+    const snapped = moveDragToWorld(rawX, rawY, point.scale)
+    const held = dragRef.current
+    if (!snapped && held && held.pointerId === drag.pointerId) {
+      const anchor = placementsRef.current.find((piece) => piece.id === held.id)
+      if (anchor && (anchor.x !== rawX || anchor.y !== rawY)) {
+        held.grabX = point.x - anchor.x
+        held.grabY = point.y - anchor.y
+      }
+    }
+    return snapped
+  }
+
+  function moveDragToWorld(rawX: number, rawY: number, scale: number): boolean {
+    const drag = dragRef.current
+    if (!drag) return false
     const clamped = clampGroup(
       placementsRef.current,
       drag.group,
@@ -1120,10 +1310,7 @@ function PuzzleTable({
       clamped.x,
       clamped.y,
     )
-    const limits = approachLimits(
-      Math.min(layout.cellW, layout.cellH),
-      point.scale,
-    )
+    const limits = approachLimits(Math.min(layout.cellW, layout.cellH), scale)
     const result = pullToNeighbors(
       moved,
       drag.group,
@@ -1150,10 +1337,6 @@ function PuzzleTable({
       ? moveGroup(result.placements, drag.group, drag.id, held.x, held.y)
       : result.placements
     const anchor = placements.find((piece) => piece.id === drag.id)
-    if (anchor && (anchor.x !== rawX || anchor.y !== rawY)) {
-      drag.grabX = point.x - anchor.x
-      drag.grabY = point.y - anchor.y
-    }
     if (result.snapped && anchor) drag.group = anchor.group
     placementsRef.current = placements
     rememberMembers(drag)
@@ -1164,12 +1347,493 @@ function PuzzleTable({
       launchSnap(moved, placements)
       pulseGroup(drag.group)
       onDrag(placements, drag.id)
+      if (drag.pointerId === GAMEPAD_POINTER) {
+        padGroupRef.current = drag.group
+        setPadGroup(drag.group)
+        setNear(null)
+        return false
+      }
       finishDrag(true)
       return true
     }
     setNear(result.near)
     onDrag(placements, drag.id)
     return false
+  }
+
+  function viewportSize(): { width: number; height: number } | null {
+    const viewport = viewportRef.current
+    if (!viewport) return null
+    const rect = viewport.getBoundingClientRect()
+    if (rect.width < 2 || rect.height < 2) return null
+    return { width: rect.width, height: rect.height }
+  }
+
+  function cameraForViewport(width: number, height: number) {
+    return cameraLimits(
+      width,
+      height,
+      area,
+      Math.min(layout.cellW, layout.cellH),
+    )
+  }
+
+  function revealGroup(group: string) {
+    const size = viewportSize()
+    const follow = followRef.current
+    if (!size || !follow) return
+    if (
+      piecesVisible(
+        follow,
+        size.width,
+        size.height,
+        placementsRef.current,
+        layout.cellW,
+        layout.cellH,
+      )
+    ) {
+      return
+    }
+    const bounds = groupWorldBounds(
+      placementsRef.current,
+      group,
+      layout.cellW,
+      layout.cellH,
+    )
+    if (!bounds || boundsVisible(follow, size.width, size.height, bounds)) {
+      return
+    }
+    const limits = cameraForViewport(size.width, size.height)
+    const next = cameraWithInterest(
+      follow,
+      bounds,
+      0,
+      0,
+      size.width,
+      size.height,
+      limits.min,
+      VIEW_MARGIN,
+    )
+    if (
+      next.zoom === follow.zoom &&
+      next.x === follow.x &&
+      next.y === follow.y
+    ) {
+      return
+    }
+    userAdjustedRef.current = true
+    commitView(next)
+  }
+
+  function clearPadSelection() {
+    if (dragRef.current?.pointerId === GAMEPAD_POINTER) finishDrag(true)
+    selectionRef.current = null
+    padGroupRef.current = null
+    interestRef.current = { x: 0, y: 0 }
+    setPadGroup(null)
+    const follow = followRef.current
+    if (
+      follow.zoom !== viewRef.current.zoom ||
+      follow.x !== viewRef.current.x ||
+      follow.y !== viewRef.current.y
+    ) {
+      viewRef.current = follow
+      setView(follow)
+    }
+  }
+
+  function selectHoveredPad(id: string) {
+    if (dragRef.current && dragRef.current.pointerId !== GAMEPAD_POINTER) {
+      return
+    }
+    if (dragRef.current?.pointerId === GAMEPAD_POINTER) finishDrag(true)
+    const placement = placementsRef.current.find((piece) => piece.id === id)
+    if (!placement) return
+    selectionRef.current = placement.id
+    padGroupRef.current = placement.group
+    setPadGroup(placement.group)
+    setFrontGroup(placement.group)
+    syncPadPointer(null, null, null)
+    revealGroup(placement.group)
+    beginGamepadDrag(placement.id)
+    if (import.meta.env.DEV) {
+      console.log(`gamepad board: select group=${placement.group}`)
+    }
+  }
+
+  function syncPadPointer(
+    next: { x: number; y: number } | null,
+    hover: string | null,
+    hoverId: string | null = null,
+  ) {
+    const prev = padPointerRef.current
+    const prevHover = padHoverRef.current
+    padPointerRef.current = next
+    padHoverRef.current = hover
+    padHoverIdRef.current = hoverId
+    if (
+      (next === null) !== (prev === null) ||
+      (next !== null &&
+        prev !== null &&
+        (Math.abs(next.x - prev.x) > 0.5 || Math.abs(next.y - prev.y) > 0.5))
+    ) {
+      setPadPointer(next)
+    }
+    if (hover !== prevHover) setPadHoverGroup(hover)
+  }
+
+  /** Move the hover pointer onto a group in a screen direction (D-pad). */
+  function hoverJump(
+    direction: PadDirection,
+    size: { width: number; height: number },
+  ): void {
+    const follow = followRef.current
+    const current = padHoverRef.current
+    const from = (current
+      ? groupScreenCenter(
+          placementsRef.current,
+          current,
+          layout.cellW,
+          layout.cellH,
+          follow,
+        )
+      : null) ??
+      padPointerRef.current ?? {
+        x: size.width / 2,
+        y: size.height / 2,
+      }
+    const next = pickGroupInDirection(
+      placementsRef.current,
+      layout.cellW,
+      layout.cellH,
+      follow,
+      from,
+      current,
+      direction,
+    )
+    if (!next) return
+    const placement = placementsRef.current.find(
+      (piece) => piece.id === next.id,
+    )
+    if (!placement) return
+    revealGroup(next.group)
+    const camera = followRef.current
+    const zoom = camera.zoom > 0 ? camera.zoom : 1
+    const bounds = groupWorldBounds(
+      placementsRef.current,
+      next.group,
+      layout.cellW,
+      layout.cellH,
+    )
+    const worldX = bounds
+      ? (bounds.minX + bounds.maxX) / 2
+      : placement.x + layout.cellW / 2
+    const worldY = bounds
+      ? (bounds.minY + bounds.maxY) / 2
+      : placement.y + layout.cellH / 2
+    syncPadPointer(
+      {
+        x: Math.min(size.width, Math.max(0, worldX * zoom + camera.x)),
+        y: Math.min(size.height, Math.max(0, worldY * zoom + camera.y)),
+      },
+      next.group,
+      next.id,
+    )
+    if (import.meta.env.DEV) {
+      console.log(`gamepad board: hover ${direction} → group=${next.group}`)
+    }
+  }
+
+  function beginGamepadDrag(id: string): boolean {
+    const placement = placementsRef.current.find((piece) => piece.id === id)
+    if (!placement) return false
+    const existing = dragRef.current
+    if (existing?.pointerId === GAMEPAD_POINTER) {
+      if (existing.id === id) return true
+      finishDrag(true)
+    } else if (existing) {
+      return false
+    }
+    const memberIds = new Set(
+      placementsRef.current
+        .filter((piece) => piece.group === placement.group)
+        .map((piece) => piece.id),
+    )
+    dragRef.current = {
+      pointerId: GAMEPAD_POINTER,
+      id,
+      group: placement.group,
+      grabX: 0,
+      grabY: 0,
+      memberIds,
+      cruise: false,
+      clientX: 0,
+      clientY: 0,
+      thumb: null,
+      handoverSince: null,
+    }
+    padGroupRef.current = placement.group
+    setPadGroup(placement.group)
+    setFrontGroup(placement.group)
+    setDragGroup(placement.group)
+    onDrag(placementsRef.current, placement.id)
+    return true
+  }
+
+  function moveDragBy(
+    dx: number,
+    dy: number,
+  ): { dx: number; dy: number } | null {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== GAMEPAD_POINTER) return null
+    const before = placementsRef.current.find((piece) => piece.id === drag.id)
+    if (!before) return null
+    const scale = viewRef.current.zoom > 0 ? viewRef.current.zoom : 1
+    moveDragToWorld(before.x + dx, before.y + dy, scale)
+    const held = dragRef.current
+    if (!held || held.pointerId !== GAMEPAD_POINTER) return null
+    const after = placementsRef.current.find((piece) => piece.id === held.id)
+    if (!after) return null
+    return { dx: after.x - before.x, dy: after.y - before.y }
+  }
+
+  function gamepadTick(now: number) {
+    const clock = padClockRef.current
+    const dt =
+      clock.last === 0
+        ? 0
+        : Math.min(0.05, Math.max(0, (now - clock.last) / 1000))
+    clock.last = now
+    const { reading, receiving } = getGamepadState()
+    if (receiving && !clock.latched) {
+      clock.latched = true
+      clock.showUntil = now + GAMEPAD_BLINK_MS
+    }
+    if (!receiving && now >= clock.showUntil) clock.latched = false
+    const show = now < clock.showUntil
+    if (show !== blinkRef.current) {
+      blinkRef.current = show
+      setGamepadBlink(show)
+    }
+    if (!reading) {
+      clock.l1 = false
+      clock.r1 = false
+      clock.up = false
+      clock.down = false
+      clock.leftPad = false
+      clock.rightPad = false
+      if (dragRef.current?.pointerId === GAMEPAD_POINTER) finishDrag(true)
+      syncPadPointer(null, null)
+      const interest = interestRef.current
+      if (interest.x !== 0 || interest.y !== 0) {
+        interestRef.current = { x: 0, y: 0 }
+        const follow = followRef.current
+        if (
+          follow.zoom !== viewRef.current.zoom ||
+          follow.x !== viewRef.current.x ||
+          follow.y !== viewRef.current.y
+        ) {
+          viewRef.current = follow
+          setView(follow)
+        }
+      }
+      return
+    }
+    const l1Edge = reading.l1 && !clock.l1
+    const upEdge = reading.up && !clock.up
+    const downEdge = reading.down && !clock.down
+    const leftEdge = reading.leftPad && !clock.leftPad
+    const rightEdge = reading.rightPad && !clock.rightPad
+    clock.l1 = reading.l1
+    clock.r1 = reading.r1
+    clock.up = reading.up
+    clock.down = reading.down
+    clock.leftPad = reading.leftPad
+    clock.rightPad = reading.rightPad
+    /** R1 halves stick speed while held. */
+    const stickScale = reading.r1 ? 0.5 : 1
+    const leftX = reading.left.x * stickScale
+    const leftY = reading.left.y * stickScale
+    const rightX = reading.right.x * stickScale
+    const rightY = reading.right.y * stickScale
+    const dpadDirection: PadDirection | null = rightEdge
+      ? 'right'
+      : leftEdge
+        ? 'left'
+        : downEdge
+          ? 'down'
+          : upEdge
+            ? 'up'
+            : null
+    if (dt === 0) return
+
+    const size = viewportSize()
+    if (!size) return
+    let follow = followRef.current
+    const limits = cameraForViewport(size.width, size.height)
+    const pull = reading.l2 - reading.r2
+    if (pull !== 0 && follow.zoom > 0) {
+      const selectedPiece = selectionRef.current
+        ? placementsRef.current.find(
+            (piece) => piece.id === selectionRef.current,
+          )
+        : undefined
+      const bounds = selectedPiece
+        ? groupWorldBounds(
+            placementsRef.current,
+            selectedPiece.group,
+            layout.cellW,
+            layout.cellH,
+          )
+        : null
+      const worldX = bounds
+        ? (bounds.minX + bounds.maxX) / 2
+        : (size.width / 2 - follow.x) / follow.zoom
+      const worldY = bounds
+        ? (bounds.minY + bounds.maxY) / 2
+        : (size.height / 2 - follow.y) / follow.zoom
+      follow = zoomCamera(
+        follow,
+        worldX * follow.zoom + follow.x,
+        worldY * follow.zoom + follow.y,
+        Math.exp(pull * TRIGGER_ZOOM_PER_SEC * dt),
+        limits.min,
+        limits.max,
+      )
+    }
+
+    if (!selectionRef.current) {
+      interestRef.current = { x: 0, y: 0 }
+      if (rightX !== 0 || rightY !== 0) {
+        follow = {
+          ...follow,
+          x: follow.x - rightX * PAN_SPEED_PX * dt,
+          y: follow.y - rightY * PAN_SPEED_PX * dt,
+        }
+      }
+      if (dpadDirection) {
+        hoverJump(dpadDirection, size)
+        follow = followRef.current
+      } else {
+        let pointer = padPointerRef.current
+        if (!pointer) {
+          pointer = { x: size.width / 2, y: size.height / 2 }
+        }
+        pointer = {
+          x: Math.min(
+            size.width,
+            Math.max(0, pointer.x + leftX * POINTER_SPEED_PX * dt),
+          ),
+          y: Math.min(
+            size.height,
+            Math.max(0, pointer.y + leftY * POINTER_SPEED_PX * dt),
+          ),
+        }
+        const shownZoom = follow.zoom > 0 ? follow.zoom : 1
+        const worldX = (pointer.x - follow.x) / shownZoom
+        const worldY = (pointer.y - follow.y) / shownZoom
+        const hit = groupAtWorld(
+          placementsRef.current,
+          worldX,
+          worldY,
+          layout.cellW,
+          layout.cellH,
+          padHoverRef.current,
+        )
+        syncPadPointer(pointer, hit?.group ?? null, hit?.id ?? null)
+      }
+      if (l1Edge && padHoverIdRef.current) {
+        selectHoveredPad(padHoverIdRef.current)
+      }
+      followRef.current = follow
+      if (
+        follow.zoom !== viewRef.current.zoom ||
+        follow.x !== viewRef.current.x ||
+        follow.y !== viewRef.current.y
+      ) {
+        userAdjustedRef.current = true
+        viewRef.current = follow
+        setView(follow)
+      }
+      return
+    }
+
+    if (l1Edge) clearPadSelection()
+    syncPadPointer(null, null, null)
+    const fitAll = piecesVisible(
+      follow,
+      size.width,
+      size.height,
+      placementsRef.current,
+      layout.cellW,
+      layout.cellH,
+    )
+    const moving = leftX !== 0 || leftY !== 0
+    if (moving && selectionRef.current) {
+      clock.idle = 0
+      if (!fitAll) {
+        const held = placementsRef.current.find(
+          (piece) => piece.id === selectionRef.current,
+        )
+        const bounds = held
+          ? groupWorldBounds(
+              placementsRef.current,
+              held.group,
+              layout.cellW,
+              layout.cellH,
+            )
+          : null
+        if (bounds && !boundsVisible(follow, size.width, size.height, bounds)) {
+          follow = cameraWithInterest(
+            follow,
+            bounds,
+            0,
+            0,
+            size.width,
+            size.height,
+            limits.min,
+            VIEW_MARGIN,
+          )
+        }
+      }
+      if (beginGamepadDrag(selectionRef.current)) {
+        const shownZoom = viewRef.current.zoom > 0 ? viewRef.current.zoom : 1
+        const applied = moveDragBy(
+          (leftX * PIECE_SPEED_PX * dt) / shownZoom,
+          (leftY * PIECE_SPEED_PX * dt) / shownZoom,
+        )
+        if (applied && !fitAll) {
+          follow = {
+            ...follow,
+            x: follow.x - applied.dx * follow.zoom,
+            y: follow.y - applied.dy * follow.zoom,
+          }
+        }
+      }
+    } else if (dragRef.current?.pointerId === GAMEPAD_POINTER) {
+      clock.idle += dt
+      if (clock.idle >= GAMEPAD_RELEASE_S) {
+        finishDrag(true)
+        clock.idle = 0
+      }
+    }
+
+    const look = !fitAll
+      ? lookOffset(rightX, rightY, size.width, size.height, follow.zoom)
+      : { x: 0, y: 0 }
+    interestRef.current = look
+    followRef.current = follow
+    const shown = present(follow)
+    if (
+      shown.zoom === viewRef.current.zoom &&
+      shown.x === viewRef.current.x &&
+      shown.y === viewRef.current.y
+    ) {
+      return
+    }
+    userAdjustedRef.current = true
+    viewRef.current = shown
+    setView(shown)
   }
 
   function beginCruise(clientX: number, clientY: number) {
@@ -1197,6 +1861,7 @@ function PuzzleTable({
 
   function cruiseTick(now: number) {
     cruiseFrameRef.current = 0
+    interestRef.current = { x: 0, y: 0 }
     const cruise = cruiseRef.current
     if (!cruise || pinchActiveRef.current) {
       cruiseRef.current = null
@@ -1290,6 +1955,8 @@ function PuzzleTable({
     }
     const savedGrabX = drag.grabX
     const savedGrabY = drag.grabY
+    interestRef.current = { x: 0, y: 0 }
+    followRef.current = next
     viewRef.current = next
     moveDragTo(drag.clientX, drag.clientY)
     const held = dragRef.current
@@ -1315,6 +1982,7 @@ function PuzzleTable({
       }
     }
     userAdjustedRef.current = true
+    followRef.current = next
     viewRef.current = next
     setView(next)
     publishPointer(drag.clientX, drag.clientY)
@@ -1440,6 +2108,11 @@ function PuzzleTable({
                     raisedGroups.includes(placement.group)
                   }
                   dragging={placement.group === dragGroup}
+                  marked={placement.group === padGroup}
+                  hovering={
+                    placement.group === padHoverGroup &&
+                    placement.group !== padGroup
+                  }
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
@@ -1451,6 +2124,26 @@ function PuzzleTable({
             ))}
           </div>
         )}
+        {padPointer ? (
+          <div
+            className={
+              padHoverGroup
+                ? 'gamepad-pointer gamepad-pointer--hot'
+                : 'gamepad-pointer'
+            }
+            aria-hidden="true"
+            style={{ left: padPointer.x, top: padPointer.y }}
+          />
+        ) : null}
+        {gamepadBlink ? (
+          <div
+            className="gamepad-blink"
+            role="img"
+            aria-label={messages.play.gamepad}
+          >
+            <GamepadIcon />
+          </div>
+        ) : null}
         <button
           type="button"
           className="button play-mode__leave"
@@ -1520,6 +2213,8 @@ function PieceCanvas({
   offsetY,
   raised,
   dragging,
+  marked,
+  hovering,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -1534,6 +2229,8 @@ function PieceCanvas({
   offsetY: number
   raised: boolean
   dragging: boolean
+  marked: boolean
+  hovering: boolean
   onPointerDown: (
     event: React.PointerEvent<HTMLCanvasElement>,
     id: string,
@@ -1554,7 +2251,12 @@ function PieceCanvas({
   }, [image, piece, cellW, cellH, pad])
 
   const glow = usePieceGlow(near, pulse)
-  const className = ['piece', dragging ? 'piece--dragging' : '']
+  const className = [
+    'piece',
+    dragging ? 'piece--dragging' : '',
+    marked ? 'piece--pad' : '',
+    hovering ? 'piece--pad-hover' : '',
+  ]
     .filter(Boolean)
     .join(' ')
   const shift =
@@ -1630,6 +2332,21 @@ function RemotePointer({
         <span>{cursor.name}</span>
       </span>
     </div>
+  )
+}
+
+function GamepadIcon() {
+  return (
+    <svg className="gamepad-blink__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M7.2 7.2h9.6c2.2 0 4.2 1.9 4.2 4.4 0 2.7-1.4 4.9-3.3 4.9-1.1 0-1.8-.6-2.5-1.5l-.6-.8H9.4l-.6.8c-.7.9-1.4 1.5-2.5 1.5-1.9 0-3.3-2.2-3.3-4.9 0-2.5 2-4.4 4.2-4.4z"
+      />
+      <path
+        fill="var(--surface)"
+        d="M8.1 10.2h1.3v1.1h1.1v1.3H9.4v1.1H8.1v-1.1H7v-1.3h1.1zM15.2 11.4a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zm2.2-1.3a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8z"
+      />
+    </svg>
   )
 }
 
