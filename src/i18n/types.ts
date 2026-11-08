@@ -56,6 +56,8 @@ export interface Messages {
     commitShow: string
     commitHide: string
     telegramDebug: string
+    telegramUrlParams: string
+    telegramUrlParamsEmpty: string
   }
   puzzles: {
     title: string

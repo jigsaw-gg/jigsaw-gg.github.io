@@ -59,6 +59,9 @@ export const es: Messages = {
     commitShow: 'Ver commit',
     commitHide: 'Ocultar commit',
     telegramDebug: 'Telegram Mini App',
+    telegramUrlParams: 'Parámetros de lanzamiento en la URL de Telegram',
+    telegramUrlParamsEmpty:
+      'No hay parámetros tgWebApp* en la URL ni en el almacenamiento del SDK.',
   },
   puzzles: {
     title: 'Nuevo puzle',

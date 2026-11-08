@@ -420,6 +420,23 @@
   font-size: 1.05rem;
 }
 
+.about-telegram__subheading {
+  margin: 1.25rem 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.about-telegram__url-params {
+  grid-template-columns: 1fr;
+}
+
+.about-telegram__url-param code {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+
 .about-version {
   margin: 0 0 1rem;
   font-size: 1rem;

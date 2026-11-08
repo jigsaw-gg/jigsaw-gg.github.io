@@ -122,7 +122,42 @@ export function AboutPage() {
               <code>{sampleInvite}</code>
             </dd>
           </div>
+          <div>
+            <dt>href</dt>
+            <dd>
+              <code>{telegram.href || '—'}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>search</dt>
+            <dd>
+              <code>{telegram.search || '—'}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>hash</dt>
+            <dd>
+              <code>{telegram.hash || '—'}</code>
+            </dd>
+          </div>
         </dl>
+        <h3 className="about-telegram__subheading">
+          {messages.about.telegramUrlParams}
+        </h3>
+        {telegram.urlLaunchParams.length === 0 ? (
+          <p className="muted">{messages.about.telegramUrlParamsEmpty}</p>
+        ) : (
+          <dl className="facts about-telegram__url-params">
+            {telegram.urlLaunchParams.map(({ key, value }) => (
+              <div key={key} className="about-telegram__url-param">
+                <dt>{key}</dt>
+                <dd>
+                  <code>{value || '—'}</code>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </section>
     </main>
   )

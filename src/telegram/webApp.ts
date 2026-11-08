@@ -25,6 +25,115 @@ export type TelegramDebugInfo = {
   miniAppTitle: string
   viewportHeight: number
   isExpanded: boolean
+  /** Full page URL as seen by the Mini App (Telegram usually puts params in the hash). */
+  href: string
+  search: string
+  hash: string
+  /**
+   * Launch params Telegram injects (`tgWebApp*`), merged from the current URL
+   * and the SDK’s stored `Telegram.WebView.initParams` / sessionStorage copy.
+   */
+  urlLaunchParams: Array<{ key: string; value: string }>
+}
+
+type TelegramWebViewWindow = Window & {
+  Telegram?: {
+    WebView?: {
+      initParams?: Record<string, string | null | undefined>
+    }
+  }
+}
+
+function urlSafeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, '%20'))
+  } catch {
+    return value
+  }
+}
+
+/** Mirror Telegram’s hash parser so About can show what the client actually got. */
+function parseTelegramHashParams(
+  locationHash: string,
+): Record<string, string | null> {
+  const params: Record<string, string | null> = {}
+  const raw = locationHash.replace(/^#/, '')
+  if (!raw.length) return params
+  if (!raw.includes('=') && !raw.includes('?')) {
+    params._path = urlSafeDecode(raw)
+    return params
+  }
+  let query = raw
+  const qIndex = raw.indexOf('?')
+  if (qIndex >= 0) {
+    params._path = urlSafeDecode(raw.slice(0, qIndex))
+    query = raw.slice(qIndex + 1)
+  }
+  for (const part of query.split('&')) {
+    if (!part) continue
+    const eq = part.indexOf('=')
+    const name = urlSafeDecode(eq < 0 ? part : part.slice(0, eq))
+    const value = eq < 0 ? null : urlSafeDecode(part.slice(eq + 1))
+    params[name] = value
+  }
+  return params
+}
+
+function isTelegramLaunchParamKey(key: string): boolean {
+  return key.startsWith('tgWebApp') || key === '_path'
+}
+
+/** Collect Telegram launch params from URL + SDK storage (hash often cleared after navigate). */
+export function readTelegramUrlLaunchParams(): Record<string, string | null> {
+  const merged: Record<string, string | null> = {}
+
+  try {
+    const stored = sessionStorage.getItem('__telegram__initParams')
+    if (stored) {
+      const parsed = JSON.parse(stored) as Record<string, unknown>
+      for (const [key, value] of Object.entries(parsed)) {
+        if (!isTelegramLaunchParamKey(key)) continue
+        merged[key] = value == null ? null : String(value)
+      }
+    }
+  } catch {
+    // ignore storage / JSON errors
+  }
+
+  try {
+    const initParams = (window as TelegramWebViewWindow).Telegram?.WebView
+      ?.initParams
+    if (initParams) {
+      for (const [key, value] of Object.entries(initParams)) {
+        if (!isTelegramLaunchParamKey(key)) continue
+        merged[key] = value == null ? null : String(value)
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    for (const [key, value] of new URLSearchParams(window.location.search)) {
+      if (!isTelegramLaunchParamKey(key)) continue
+      merged[key] = value
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    for (const [key, value] of Object.entries(
+      parseTelegramHashParams(window.location.hash),
+    )) {
+      if (!isTelegramLaunchParamKey(key)) continue
+      merged[key] = value
+    }
+  } catch {
+    // ignore
+  }
+
+  return merged
 }
 
 let bootstrapped = false
@@ -50,15 +159,8 @@ export function bootstrapTelegramWebApp(): void {
 export function readTelegramStartParam(): string | null {
   const fromSdk = WebApp.initDataUnsafe?.start_param?.trim()
   if (fromSdk) return fromSdk
-  try {
-    const fromQuery = new URLSearchParams(window.location.search).get(
-      'tgWebAppStartParam',
-    )
-    const trimmed = fromQuery?.trim()
-    return trimmed || null
-  } catch {
-    return null
-  }
+  const fromUrl = readTelegramUrlLaunchParams().tgWebAppStartParam?.trim()
+  return fromUrl || null
 }
 
 export function readTelegramColorScheme(): ResolvedTheme | null {
@@ -121,14 +223,14 @@ export function hapticSelection(): void {
 
 export function readTelegramDebugInfo(): TelegramDebugInfo {
   const user = WebApp.initDataUnsafe?.user
-  let tgWebAppStartParam: string | null
-  try {
-    tgWebAppStartParam = new URLSearchParams(window.location.search).get(
-      'tgWebAppStartParam',
-    )
-  } catch {
-    tgWebAppStartParam = null
-  }
+  const urlLaunch = readTelegramUrlLaunchParams()
+  const tgWebAppStartParam = urlLaunch.tgWebAppStartParam ?? null
+  const urlLaunchParams = Object.keys(urlLaunch)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => ({
+      key,
+      value: urlLaunch[key] ?? '',
+    }))
   return {
     miniApp: isTelegramMiniApp(),
     platform: WebApp.platform,
@@ -147,6 +249,10 @@ export function readTelegramDebugInfo(): TelegramDebugInfo {
     miniAppTitle: telegramMiniAppTitle(),
     viewportHeight: WebApp.viewportHeight,
     isExpanded: WebApp.isExpanded,
+    href: window.location.href,
+    search: window.location.search,
+    hash: window.location.hash,
+    urlLaunchParams,
   }
 }
 

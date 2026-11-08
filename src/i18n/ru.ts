@@ -68,6 +68,8 @@ export const ru: Messages = {
     commitShow: 'Показать коммит',
     commitHide: 'Скрыть коммит',
     telegramDebug: 'Telegram Mini App',
+    telegramUrlParams: 'Параметры запуска из URL Telegram',
+    telegramUrlParamsEmpty: 'Нет параметров tgWebApp* в URL или хранилище SDK.',
   },
   puzzles: {
     title: 'Новый пазл',
