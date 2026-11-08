@@ -9,6 +9,7 @@ import { ConnectionPill } from './components/ConnectionPill.tsx'
 import { ThemeSwitcher } from './components/ThemeSwitcher.tsx'
 import { AboutPage } from './pages/AboutPage.tsx'
 import { HomePage } from './pages/HomePage.tsx'
+import { PlayPage } from './pages/PlayPage.tsx'
 import { PuzzlesPage } from './pages/PuzzlesPage.tsx'
 import { useApinatorStatus } from './useApinatorStatus.ts'
 import './App.css'
@@ -38,6 +39,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage status={status} />} />
           <Route path="/puzzles" element={<PuzzlesPage />} />
+          <Route path="/play/:sessionId" element={<PlayPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

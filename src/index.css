@@ -18,6 +18,7 @@
   --badge-bad-bg: #f8d7da;
   --badge-bad-text: #58151c;
   --theme-switcher-active-bg: #e8edf2;
+  --board: #e4ebf2;
 }
 
 :root[data-theme='dark'] {
@@ -39,6 +40,7 @@
   --badge-bad-bg: #2c1215;
   --badge-bad-text: #f5c2c7;
   --theme-switcher-active-bg: #2a313c;
+  --board: #0e131a;
 }
 
 :root {

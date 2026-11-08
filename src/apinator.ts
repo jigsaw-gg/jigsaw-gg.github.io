@@ -95,12 +95,15 @@ export function getApinatorStatus(): ApinatorSnapshot {
   return snapshot
 }
 
-function startApinator(appKey: string): void {
-  const client = new Apinator({
-    appKey,
-    cluster: APINATOR_CLUSTER,
-  })
+export const apinator: Apinator | null = APINATOR_APP_KEY
+  ? new Apinator({
+      appKey: APINATOR_APP_KEY,
+      cluster: APINATOR_CLUSTER,
+      authEndpoint: '/api/realtime/auth',
+    })
+  : null
 
+function startApinator(client: Apinator): void {
   client.connect()
 
   const channel = client.subscribe(APINATOR_CHANNEL)
@@ -157,8 +160,8 @@ function startApinator(appKey: string): void {
   })
 }
 
-if (APINATOR_APP_KEY) {
-  startApinator(APINATOR_APP_KEY)
+if (apinator) {
+  startApinator(apinator)
 } else {
   snapshot = {
     state: 'unavailable',
