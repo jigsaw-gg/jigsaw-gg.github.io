@@ -58,34 +58,136 @@ function easeInOut(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
 }
 
-function useFade(active: boolean): number {
-  const motion = allowsMotion()
-  const [value, setValue] = useState(active ? 1 : 0)
-  const valueRef = useRef(value)
+interface GlowClock {
+  sync: (active: boolean, pulse: number) => void
+  stop: () => void
+}
+
+/**
+ * Proximity eases the glow in and, once the piece leaves, back out.
+ * Each join adds a cycle that fades all the way in and then all the way
+ * out. A later move must not retarget that cycle, or a fast snap finishes
+ * before the first frame and the highlight never appears.
+ */
+function createGlowClock(publish: (value: number) => void): GlowClock {
+  const glow = {
+    value: 0,
+    phase: 'idle' as 'idle' | 'in' | 'hold' | 'out',
+    from: 0,
+    to: 0,
+    started: 0,
+    active: false,
+    pulse: 0,
+    pending: 0,
+    outPays: false,
+    frame: 0,
+  }
+
+  function kick() {
+    if (glow.frame !== 0) return
+    if (glow.phase !== 'in' && glow.phase !== 'out') return
+    glow.frame = requestAnimationFrame(tick)
+  }
+
+  function tick(now: number) {
+    glow.frame = 0
+    if (glow.phase !== 'in' && glow.phase !== 'out') return
+    const span = glow.to - glow.from
+    const t = Math.min(1, (now - glow.started) / GLOW_MS)
+    const next = glow.from + span * easeInOut(t)
+    glow.value = next
+    publish(next)
+    if (t < 1) {
+      kick()
+      return
+    }
+    finish(now)
+  }
+
+  function finish(now: number) {
+    const pays = glow.phase === 'out' && glow.outPays
+    glow.value = glow.to
+    publish(glow.to)
+    if (pays && glow.pending > 0) glow.pending -= 1
+    glow.outPays = false
+    glow.phase = 'idle'
+    steer(now)
+  }
+
+  function begin(phase: 'in' | 'out', now: number) {
+    glow.phase = phase
+    glow.from = glow.value
+    glow.to = phase === 'in' ? 1 : 0
+    glow.started = now
+    glow.outPays = phase === 'out' && glow.pending > 0
+    if (Math.abs(glow.from - glow.to) < 0.001) {
+      finish(now)
+      return
+    }
+    kick()
+  }
+
+  function steer(now: number) {
+    if (!allowsMotion()) {
+      if (glow.frame !== 0) {
+        cancelAnimationFrame(glow.frame)
+        glow.frame = 0
+      }
+      glow.pending = 0
+      glow.outPays = false
+      glow.phase = glow.active ? 'hold' : 'idle'
+      const next = glow.active ? 1 : 0
+      glow.value = next
+      publish(next)
+      return
+    }
+    if (glow.phase === 'in') {
+      if (!glow.active && glow.pending === 0) begin('out', now)
+      else kick()
+      return
+    }
+    if (glow.phase === 'out') {
+      kick()
+      return
+    }
+    if (glow.pending > 0) {
+      if (glow.value >= 0.999) begin('out', now)
+      else begin('in', now)
+      return
+    }
+    if (glow.active) {
+      if (glow.value < 0.999) begin('in', now)
+      else glow.phase = 'hold'
+      return
+    }
+    if (glow.value > 0.001) begin('out', now)
+  }
+
+  return {
+    sync(active: boolean, pulse: number) {
+      glow.active = active
+      if (pulse > glow.pulse) glow.pending += pulse - glow.pulse
+      glow.pulse = pulse
+      steer(performance.now())
+    },
+    stop() {
+      if (glow.frame === 0) return
+      cancelAnimationFrame(glow.frame)
+      glow.frame = 0
+    },
+  }
+}
+
+function usePieceGlow(active: boolean, pulse: number): number {
+  const [value, setValue] = useState(0)
+  const clock = useRef<GlowClock | null>(null)
+  if (clock.current === null) clock.current = createGlowClock(setValue)
 
   useEffect(() => {
-    const to = active ? 1 : 0
-    const from = valueRef.current
-    if (Math.abs(from - to) < 0.001) return
-    if (!motion) {
-      const frame = requestAnimationFrame(() => {
-        valueRef.current = to
-        setValue(to)
-      })
-      return () => cancelAnimationFrame(frame)
-    }
-    const start = performance.now()
-    let frame = 0
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / GLOW_MS)
-      const next = from + (to - from) * easeInOut(t)
-      valueRef.current = next
-      setValue(next)
-      if (t < 1) frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [active, motion])
+    clock.current?.sync(active, pulse)
+  }, [active, pulse])
+
+  useEffect(() => () => clock.current?.stop(), [])
 
   return value
 }
@@ -173,6 +275,9 @@ function PuzzleTable({
   const [failed, setFailed] = useState(false)
   const [placements, setPlacements] = useState(sharedPlacements)
   const [near, setNear] = useState<NearPair | null>(null)
+  const [pulses, setPulses] = useState<ReadonlyMap<string, number>>(
+    () => new Map(),
+  )
   const [frontGroup, setFrontGroup] = useState<string | null>(null)
   const [dragGroup, setDragGroup] = useState<string | null>(null)
   const [panning, setPanning] = useState(false)
@@ -429,6 +534,18 @@ function PuzzleTable({
     beginSlide()
   }
 
+  function pulseGroup(group: string) {
+    const ids = placementsRef.current
+      .filter((piece) => piece.group === group)
+      .map((piece) => piece.id)
+    if (ids.length === 0) return
+    setPulses((current) => {
+      const next = new Map(current)
+      for (const id of ids) next.set(id, (next.get(id) ?? 0) + 1)
+      return next
+    })
+  }
+
   function endPan(event: React.PointerEvent<HTMLDivElement>) {
     const pan = panRef.current
     if (!pan || pan.pointerId !== event.pointerId) return
@@ -579,6 +696,7 @@ function PuzzleTable({
     setFrontGroup(drag.group)
     if (result.snapped) {
       launchSnap(moved, placements)
+      pulseGroup(drag.group)
       onDrag(placements, drag.id)
       finishDrag(true)
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -664,6 +782,7 @@ function PuzzleTable({
                     (placement.group === near.group ||
                       placement.group === near.neighborGroup)
                   }
+                  pulse={pulses.get(placement.id) ?? 0}
                   offsetX={slide?.x ?? 0}
                   offsetY={slide?.y ?? 0}
                   raised={
@@ -701,6 +820,7 @@ function PieceCanvas({
   placement,
   layout,
   near,
+  pulse,
   offsetX,
   offsetY,
   raised,
@@ -714,6 +834,7 @@ function PieceCanvas({
   placement: Placement
   layout: ScatteredBoard
   near: boolean
+  pulse: number
   offsetX: number
   offsetY: number
   raised: boolean
@@ -737,7 +858,7 @@ function PieceCanvas({
     drawPiece(canvas, image, piece, cellW, cellH, pad)
   }, [image, piece, cellW, cellH, pad])
 
-  const glow = useFade(near)
+  const glow = usePieceGlow(near, pulse)
   const className = ['piece', dragging ? 'piece--dragging' : '']
     .filter(Boolean)
     .join(' ')
