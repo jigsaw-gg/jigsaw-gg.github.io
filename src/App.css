@@ -335,9 +335,22 @@
   cursor: not-allowed;
 }
 
+.button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--bg);
+}
+
 .invite {
   display: flex;
   align-items: flex-end;
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
 
@@ -346,19 +359,85 @@
   margin-bottom: 0;
 }
 
-.puzzle-board {
-  display: grid;
-  gap: 0.65rem;
-  margin-top: 1.25rem;
-  padding: 0.75rem;
-  border-radius: 12px;
+.play-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--board-limit);
+}
+
+.play-mode--inactive {
+  display: none;
+}
+
+.play-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  overscroll-behavior: none;
+  cursor: grab;
+  background: var(--board-limit);
+}
+
+.play-viewport--panning,
+.play-viewport--panning .piece {
+  cursor: grabbing;
+}
+
+.play-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.play-limit,
+.play-field {
+  position: absolute;
+  pointer-events: none;
+}
+
+.play-limit {
+  background-color: var(--board-limit);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 22px,
+    var(--board-limit-stripe) 22px 30px
+  );
+}
+
+.play-field {
   background: var(--board);
-  border: 1px solid var(--border);
+  outline: 10px solid var(--board-edge);
+}
+
+.play-mode__leave {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 5;
+}
+
+.play-viewport .banner {
+  margin: 4.5rem 1rem 0;
 }
 
 .piece {
+  position: absolute;
   display: block;
-  width: 100%;
-  height: auto;
+  cursor: grab;
   background: transparent;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.piece--dragging {
+  cursor: grabbing;
+}
+
+.piece--near {
+  filter: drop-shadow(0 0 3px #fff6d8) drop-shadow(0 0 8px var(--accent));
 }
