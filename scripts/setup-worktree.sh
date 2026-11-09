@@ -9,10 +9,8 @@ fi
 
 if [[ -f .worktree-port ]]; then
   echo "worktree dev port $(tr -d '[:space:]' < .worktree-port)"
-  exit 0
-fi
-
-node --input-type=module <<'EOF'
+else
+  node --input-type=module <<'EOF'
 import { createServer } from 'node:net'
 import { writeFileSync } from 'node:fs'
 
@@ -42,3 +40,10 @@ for (const port of candidates) {
 console.error('no free port for this worktree')
 process.exit(1)
 EOF
+fi
+
+# Worktrees do not share node_modules with the main checkout.
+if [[ ! -x node_modules/.bin/vite ]]; then
+  echo "installing npm dependencies (vite missing)"
+  npm ci
+fi

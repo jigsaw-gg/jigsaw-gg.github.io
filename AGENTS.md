@@ -15,15 +15,21 @@ There is no test runner. For a UI change, run the dev server and use the page.
 
 ## Dev server port
 
-A git worktree does not use Vite's default port. Setup (`.cursor/worktrees.json` → `scripts/setup-worktree.sh`) picks a free port in 20000–49999 and writes it to `.worktree-port`. That file is gitignored and stays with the worktree. Vite reads it and binds `127.0.0.1` with `strictPort`, so the server will not move to another port if this one is busy.
+A git worktree does not use Vite's default port. Setup (`.cursor/worktrees.json` → `scripts/setup-worktree.sh`) picks a free port in 20000–49999 and writes it to `.worktree-port`, then runs `npm ci` when `node_modules/.bin/vite` is missing. `.worktree-port` is gitignored and stays with the worktree. Vite reads it and binds `127.0.0.1` with `strictPort`, so the server will not move to another port if this one is busy.
 
 The main checkout has no `.worktree-port`. There, `npm run dev` keeps Vite's default port.
 
 When working in a worktree:
 
+- Run `bash scripts/setup-worktree.sh` from the worktree root after `git worktree add` (or rely on `.cursor/worktrees.json`). It keeps an existing `.worktree-port` and installs deps when Vite is absent. Do not expect the main checkout's `node_modules` to be available.
 - Read `.worktree-port` before starting the dev server or opening the app. The URL is `http://127.0.0.1:<port>/`.
 - Run `npm run dev` or `vite` with no `--port` flag, so the worktree port is the one that is used.
-- If `.worktree-port` is missing, run `bash scripts/setup-worktree.sh` from the worktree root. If the file is already present, that script keeps the same port.
+
+## LAN HTTPS (Gamepad / phone)
+
+Chromium only exposes the Gamepad API in a secure context. `http://127.0.0.1` counts; `http://<lan-ip>` does not. For a phone or other LAN client, start Vite with `--host 0.0.0.0` (the local `/spawn-lan-server` skill does this). That host flag turns on the in-repo self-signed listener in `dev/devHttps.ts` (needs system `openssl`). The Network URL is then `https://<lan-ip>:<port>/`. Accept the certificate warning once.
+
+Do not add a separate HTTPS npm package for this. Cert material is written under `tmp/` (`dev-key.pem`, `dev-cert.pem`); that directory is gitignored — never commit it.
 
 ## Apinator
 
