@@ -715,11 +715,23 @@ html:has(.embedded-safari) .play-mode {
   padding-right: 5.4rem;
 }
 
-.field__random {
+.field__control--with-telegram input {
+  padding-right: 12.5rem;
+}
+
+.field__suggest {
   position: absolute;
   top: 50%;
   right: 0.35rem;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  max-width: calc(100% - 1.2rem);
+}
+
+.field__random {
+  flex: 0 0 auto;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -730,6 +742,15 @@ html:has(.embedded-safari) .play-mode {
   line-height: 1;
   padding: 0.25rem 0.4rem;
   cursor: pointer;
+}
+
+.field__random--telegram {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .field__random:hover {
