@@ -120,6 +120,20 @@ export interface Messages {
     handoverLeft: string
     gamepad: string
     win: string
+    gamepadHelpCue: string
+    gamepadHelpTitle: string
+    gamepadHelpClose: string
+    gamepadHelp: {
+      leftStick: string
+      rightStick: string
+      l1: string
+      r1: string
+      l2: string
+      r2: string
+      dpad: string
+      triangle: string
+      cross: string
+    }
   }
   errors: {
     appKeyMissing: string

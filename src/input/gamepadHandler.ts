@@ -86,7 +86,8 @@ function updateLoop(): void {
   })
   if (import.meta.env.DEV && reading) {
     const diag =
-      `cross=${reading.cross ? 1 : 0} l1=${reading.l1 ? 1 : 0} r1=${reading.r1 ? 1 : 0} ` +
+      `cross=${reading.cross ? 1 : 0} triangle=${reading.triangle ? 1 : 0} ` +
+      `l1=${reading.l1 ? 1 : 0} r1=${reading.r1 ? 1 : 0} ` +
       `dpad=${reading.up ? 'U' : ''}${reading.down ? 'D' : ''}${reading.leftPad ? 'L' : ''}${reading.rightPad ? 'R' : '-'} ` +
       `l2=${reading.l2.toFixed(2)} r2=${reading.r2.toFixed(2)} ` +
       `left=${reading.left.x.toFixed(2)},${reading.left.y.toFixed(2)} ` +

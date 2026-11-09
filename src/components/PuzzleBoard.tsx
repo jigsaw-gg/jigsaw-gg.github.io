@@ -350,6 +350,7 @@ function PuzzleTable({
     y: number
   } | null>(null)
   const [gamepadBlink, setGamepadBlink] = useState(false)
+  const [gamepadHelpOpen, setGamepadHelpOpen] = useState(false)
   const [boardActive, setBoardActive] = useState(active)
   if (boardActive !== active) {
     setBoardActive(active)
@@ -358,6 +359,7 @@ function PuzzleTable({
       setPadHoverGroup(null)
       setPadPointer(null)
       setGamepadBlink(false)
+      setGamepadHelpOpen(false)
     }
   }
   const [panning, setPanning] = useState(false)
@@ -410,10 +412,12 @@ function PuzzleTable({
   const selectionRef = useRef<string | null>(null)
   const interestRef = useRef({ x: 0, y: 0 })
   const blinkRef = useRef(false)
+  const helpOpenRef = useRef(false)
   const padClockRef = useRef({
     last: 0,
     l1: false,
     r1: false,
+    triangle: false,
     up: false,
     down: false,
     leftPad: false,
@@ -1752,6 +1756,7 @@ function PuzzleTable({
     if (!reading) {
       clock.l1 = false
       clock.r1 = false
+      clock.triangle = false
       clock.up = false
       clock.down = false
       clock.leftPad = false
@@ -1774,16 +1779,23 @@ function PuzzleTable({
       return
     }
     const l1Edge = reading.l1 && !clock.l1
+    const triangleEdge = reading.triangle && !clock.triangle
     const upEdge = reading.up && !clock.up
     const downEdge = reading.down && !clock.down
     const leftEdge = reading.leftPad && !clock.leftPad
     const rightEdge = reading.rightPad && !clock.rightPad
     clock.l1 = reading.l1
     clock.r1 = reading.r1
+    clock.triangle = reading.triangle
     clock.up = reading.up
     clock.down = reading.down
     clock.leftPad = reading.leftPad
     clock.rightPad = reading.rightPad
+    if (triangleEdge) {
+      const next = !helpOpenRef.current
+      helpOpenRef.current = next
+      setGamepadHelpOpen(next)
+    }
     /** R1 halves stick speed while held. */
     const stickScale = reading.r1 ? 0.5 : 1
     const leftX = reading.left.x * stickScale
@@ -2283,6 +2295,60 @@ function PuzzleTable({
           </div>
         ) : null}
         {celebrating ? <WinCelebration label={messages.play.win} /> : null}
+        {gamepadHelpOpen ? null : (
+          <div className="gamepad-help-cue" aria-hidden="true">
+            <span>{messages.play.gamepadHelpCue}</span>
+            <span className="gamepad-help-cue__sep">–</span>
+            <TriangleGlyph className="gamepad-help-cue__glyph" />
+          </div>
+        )}
+        {gamepadHelpOpen ? (
+          <div
+            className="gamepad-help"
+            role="dialog"
+            aria-modal="true"
+            aria-label={messages.play.gamepadHelpTitle}
+          >
+            <div className="gamepad-help__panel">
+              <div className="gamepad-help__head">
+                <h2 className="gamepad-help__title">
+                  {messages.play.gamepadHelpTitle}
+                </h2>
+                <button
+                  type="button"
+                  className="button gamepad-help__close"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={() => {
+                    helpOpenRef.current = false
+                    setGamepadHelpOpen(false)
+                  }}
+                >
+                  {messages.play.gamepadHelpClose}
+                </button>
+              </div>
+              <ul className="gamepad-help__list">
+                {(
+                  [
+                    ['△', messages.play.gamepadHelp.triangle],
+                    ['L stick', messages.play.gamepadHelp.leftStick],
+                    ['R stick', messages.play.gamepadHelp.rightStick],
+                    ['L1', messages.play.gamepadHelp.l1],
+                    ['R1', messages.play.gamepadHelp.r1],
+                    ['L2', messages.play.gamepadHelp.l2],
+                    ['R2', messages.play.gamepadHelp.r2],
+                    ['D-pad', messages.play.gamepadHelp.dpad],
+                    ['✕', messages.play.gamepadHelp.cross],
+                  ] as const
+                ).map(([control, detail]) => (
+                  <li key={control} className="gamepad-help__row">
+                    <span className="gamepad-help__control">{control}</span>
+                    <span className="gamepad-help__detail">{detail}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null}
         <button
           type="button"
           className="button play-mode__leave"
@@ -2484,6 +2550,23 @@ function GamepadIcon() {
       <path
         fill="var(--surface)"
         d="M8.1 10.2h1.3v1.1h1.1v1.3H9.4v1.1H8.1v-1.1H7v-1.3h1.1zM15.2 11.4a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zm2.2-1.3a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8z"
+      />
+    </svg>
+  )
+}
+
+function TriangleGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      aria-hidden="true"
+    >
+      <path
+        fill="currentColor"
+        d="M8 2.2 14.2 13.4H1.8L8 2.2zm0 2.6L3.9 12.2h8.2L8 4.8z"
       />
     </svg>
   )
