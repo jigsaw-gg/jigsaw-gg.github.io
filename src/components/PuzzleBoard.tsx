@@ -2258,17 +2258,32 @@ function PuzzleTable({
                     raisedGroups.includes(placement.group)
                   }
                   dragging={placement.group === dragGroup}
-                  marked={placement.group === padGroup}
-                  hovering={
-                    placement.group === padHoverGroup &&
-                    placement.group !== padGroup
-                  }
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
                 />
               )
             })}
+            {padGroup ? (
+              <PadGroupHighlight
+                placements={placements}
+                group={padGroup}
+                cellW={layout.cellW}
+                cellH={layout.cellH}
+                pad={layout.pad}
+                mode="selected"
+              />
+            ) : null}
+            {padHoverGroup && padHoverGroup !== padGroup ? (
+              <PadGroupHighlight
+                placements={placements}
+                group={padHoverGroup}
+                cellW={layout.cellW}
+                cellH={layout.cellH}
+                pad={layout.pad}
+                mode="hover"
+              />
+            ) : null}
             {cursors.map((cursor) => (
               <RemotePointer key={cursor.id} cursor={cursor} zoom={view.zoom} />
             ))}
@@ -2407,6 +2422,41 @@ function ThumbStick({ stick }: { stick: ThumbStickView }) {
   )
 }
 
+function PadGroupHighlight({
+  placements,
+  group,
+  cellW,
+  cellH,
+  pad,
+  mode,
+}: {
+  placements: readonly Placement[]
+  group: string
+  cellW: number
+  cellH: number
+  pad: number
+  mode: 'selected' | 'hover'
+}) {
+  const bounds = groupWorldBounds(placements, group, cellW, cellH)
+  if (!bounds) return null
+  return (
+    <div
+      className={
+        mode === 'selected'
+          ? 'pad-group-hl pad-group-hl--selected'
+          : 'pad-group-hl pad-group-hl--hover'
+      }
+      aria-hidden="true"
+      style={{
+        left: bounds.minX - pad,
+        top: bounds.minY - pad,
+        width: bounds.maxX - bounds.minX + pad * 2,
+        height: bounds.maxY - bounds.minY + pad * 2,
+      }}
+    />
+  )
+}
+
 function PieceCanvas({
   image,
   piece,
@@ -2418,8 +2468,6 @@ function PieceCanvas({
   offsetY,
   raised,
   dragging,
-  marked,
-  hovering,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -2434,8 +2482,6 @@ function PieceCanvas({
   offsetY: number
   raised: boolean
   dragging: boolean
-  marked: boolean
-  hovering: boolean
   onPointerDown: (
     event: React.PointerEvent<HTMLCanvasElement>,
     id: string,
@@ -2456,12 +2502,7 @@ function PieceCanvas({
   }, [image, piece, cellW, cellH, pad])
 
   const glow = usePieceGlow(near, pulse)
-  const className = [
-    'piece',
-    dragging ? 'piece--dragging' : '',
-    marked ? 'piece--pad' : '',
-    hovering ? 'piece--pad-hover' : '',
-  ]
+  const className = ['piece', dragging ? 'piece--dragging' : '']
     .filter(Boolean)
     .join(' ')
   const shift =
