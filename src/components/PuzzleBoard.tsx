@@ -3,6 +3,7 @@ import { isExpanded } from '../fullscreen.ts'
 import { GAMEPAD_POINTER } from '../input/dualshock.ts'
 import { getState as getGamepadState } from '../input/gamepadHandler.ts'
 import { FullscreenButton } from './FullscreenButton.tsx'
+import { WinCelebration } from './WinCelebration.tsx'
 import { useI18n } from '../i18n/useI18n.ts'
 import {
   PAN_SPEED_PX,
@@ -38,6 +39,7 @@ import {
   cameraLimits,
   clampGroup,
   fitCamera,
+  isPuzzleComplete,
   moveGroup,
   pieceBounds,
   playArea,
@@ -65,7 +67,7 @@ import {
   type ThumbSide,
 } from '../puzzle/twoThumb.ts'
 import type { RemoteCursor } from '../puzzle/useWorldSync.ts'
-import { hapticImpact } from '../telegram/webApp.ts'
+import { hapticImpact, hapticNotification } from '../telegram/webApp.ts'
 
 /** Nearby-piece glow fade, in milliseconds. */
 const GLOW_MS = 260
@@ -74,11 +76,20 @@ const GAMEPAD_BLINK_MS = 3000
 /** Stick must rest this long before a controller drag is saved. */
 const GAMEPAD_RELEASE_S = 0.12
 const MOBILE_LAYOUT = '(max-width: 1100px)'
+/** How long the win banner and side decorations stay visible. */
+const WIN_CELEBRATE_MS = 3200
+/** Ease the camera onto the finished puzzle over this many ms. */
+const WIN_CAMERA_MS = 900
 /**
  * Critically damped snap, in rad/s. The piece speeds up toward the join,
  * then settles on it.
  */
 const SNAP_RESPONSE = 22
+
+/** Comfortable inset so the finished board fills the view without crowding. */
+function winFitMargin(viewportW: number, viewportH: number): number {
+  return Math.max(72, Math.min(viewportW, viewportH) * 0.1)
+}
 
 interface SlideOffset {
   x: number
@@ -353,6 +364,12 @@ function PuzzleTable({
   const [panStick, setPanStick] = useState<ThumbStickView | null>(null)
   const [cruiseStick, setCruiseStick] = useState<ThumbStickView | null>(null)
   const [handover, setHandover] = useState<HandoverView | null>(null)
+  const [boardLocked, setBoardLocked] = useState(false)
+  const [celebrating, setCelebrating] = useState(false)
+  const boardLockedRef = useRef(false)
+  const winHandledRef = useRef(false)
+  const winCameraFrameRef = useRef(0)
+  const winHideTimerRef = useRef(0)
   const offsetsRef = useRef(new Map<string, SlideOffset>())
   const slideFrameRef = useRef(0)
   const [offsets, setOffsets] = useState<ReadonlyMap<string, SlideOffset>>(
@@ -461,7 +478,9 @@ function PuzzleTable({
       cancelAnimationFrame(slideFrameRef.current)
       cancelAnimationFrame(cruiseFrameRef.current)
       cancelAnimationFrame(stickFrameRef.current)
+      cancelAnimationFrame(winCameraFrameRef.current)
       window.clearTimeout(handoverTimerRef.current)
+      window.clearTimeout(winHideTimerRef.current)
     }
   }, [])
 
@@ -469,9 +488,28 @@ function PuzzleTable({
     const viewport = viewportRef.current
     if (!viewport) return
     const fit = () => {
-      if (userAdjustedRef.current) return
       const rect = viewport.getBoundingClientRect()
       if (rect.width < 2 || rect.height < 2) return
+      if (boardLockedRef.current) {
+        const bounds = pieceBounds(
+          placementsRef.current,
+          layout.cellW,
+          layout.cellH,
+          layout.pad,
+        )
+        const next = fitCamera(
+          rect.width,
+          rect.height,
+          bounds,
+          winFitMargin(rect.width, rect.height),
+        )
+        interestRef.current = { x: 0, y: 0 }
+        followRef.current = next
+        viewRef.current = next
+        setView(next)
+        return
+      }
+      if (userAdjustedRef.current) return
       const next = fitCamera(rect.width, rect.height, opening, 0)
       interestRef.current = { x: 0, y: 0 }
       followRef.current = next
@@ -481,7 +519,94 @@ function PuzzleTable({
     const observer = new ResizeObserver(fit)
     observer.observe(viewport)
     return () => observer.disconnect()
-  }, [opening])
+  }, [opening, layout.cellW, layout.cellH, layout.pad])
+
+  const puzzleComplete = isPuzzleComplete(placements)
+  useEffect(() => {
+    if (!active || !puzzleComplete || winHandledRef.current) return
+    winHandledRef.current = true
+    boardLockedRef.current = true
+    setBoardLocked(true)
+    setCelebrating(true)
+    hapticNotification('success')
+
+    if (dragRef.current) finishDragRef.current(true)
+    panRef.current = null
+    cruiseRef.current = null
+    cancelAnimationFrame(cruiseFrameRef.current)
+    cruiseFrameRef.current = 0
+    cancelAnimationFrame(stickFrameRef.current)
+    stickFrameRef.current = 0
+    setPanning(false)
+    setPanStick(null)
+    setCruiseStick(null)
+    setHandover(null)
+    handoverRef.current = null
+    window.clearTimeout(handoverTimerRef.current)
+    handoverTimerRef.current = 0
+    setNear(null)
+    setPadGroup(null)
+    setPadHoverGroup(null)
+    setPadPointer(null)
+    selectionRef.current = null
+    padGroupRef.current = null
+    padHoverRef.current = null
+    padPointerRef.current = null
+    interestRef.current = { x: 0, y: 0 }
+
+    const viewport = viewportRef.current
+    if (viewport) {
+      const rect = viewport.getBoundingClientRect()
+      if (rect.width >= 2 && rect.height >= 2) {
+        const from = followRef.current
+        const bounds = pieceBounds(
+          placementsRef.current,
+          layout.cellW,
+          layout.cellH,
+          layout.pad,
+        )
+        const to = fitCamera(
+          rect.width,
+          rect.height,
+          bounds,
+          winFitMargin(rect.width, rect.height),
+        )
+        userAdjustedRef.current = true
+        cancelAnimationFrame(winCameraFrameRef.current)
+        if (!allowsMotion()) {
+          followRef.current = to
+          viewRef.current = to
+          setView(to)
+        } else {
+          const started = performance.now()
+          const tick = (now: number) => {
+            const t = Math.min(1, (now - started) / WIN_CAMERA_MS)
+            const ease = 1 - (1 - t) ** 3
+            const next = {
+              zoom: from.zoom + (to.zoom - from.zoom) * ease,
+              x: from.x + (to.x - from.x) * ease,
+              y: from.y + (to.y - from.y) * ease,
+            }
+            followRef.current = next
+            viewRef.current = next
+            setView(next)
+            if (t < 1) {
+              winCameraFrameRef.current = requestAnimationFrame(tick)
+              return
+            }
+            winCameraFrameRef.current = 0
+          }
+          winCameraFrameRef.current = requestAnimationFrame(tick)
+        }
+      }
+    }
+
+    window.clearTimeout(winHideTimerRef.current)
+    winHideTimerRef.current = window.setTimeout(() => {
+      winHideTimerRef.current = 0
+      setCelebrating(false)
+    }, WIN_CELEBRATE_MS)
+  }, [active, puzzleComplete, layout.cellW, layout.cellH, layout.pad])
 
   useEffect(() => {
     const yielded = yieldNonce !== yieldSeen.current
@@ -553,6 +678,7 @@ function PuzzleTable({
     const viewport = viewportRef.current
     if (!viewport) return
     const onWheel = (event: WheelEvent) => {
+      if (boardLockedRef.current) return
       const current = viewRef.current
       if (!current) return
       cruiseRef.current = null
@@ -627,6 +753,7 @@ function PuzzleTable({
     }
 
     const onDown = (event: PointerEvent) => {
+      if (boardLockedRef.current) return
       if (isScreenControl(event.target)) return
       if (event.pointerType === 'mouse' && event.button !== 0) return
       if (points.some((point) => point.id === event.pointerId)) return
@@ -1105,6 +1232,7 @@ function PuzzleTable({
   }
 
   function onViewportPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (boardLockedRef.current) return
     if (pinchActiveRef.current) return
     if (event.button !== 0 && event.button !== 1) return
     const drag = dragRef.current
@@ -1193,6 +1321,7 @@ function PuzzleTable({
     event: React.PointerEvent<HTMLCanvasElement>,
     id: string,
   ) {
+    if (boardLockedRef.current) return
     if (pinchActiveRef.current) return
     if (event.button !== 0) return
     const held = dragRef.current
@@ -1615,6 +1744,11 @@ function PuzzleTable({
       blinkRef.current = show
       setGamepadBlink(show)
     }
+    if (boardLockedRef.current) {
+      if (dragRef.current?.pointerId === GAMEPAD_POINTER) finishDrag(true)
+      syncPadPointer(null, null)
+      return
+    }
     if (!reading) {
       clock.l1 = false
       clock.r1 = false
@@ -2032,9 +2166,13 @@ function PuzzleTable({
     finishDrag(true)
   }
 
-  const viewportClass = panning
-    ? 'play-viewport play-viewport--panning'
-    : 'play-viewport'
+  const viewportClass = [
+    'play-viewport',
+    panning ? 'play-viewport--panning' : '',
+    boardLocked ? 'play-viewport--won' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className={active ? 'play-mode' : 'play-mode play-mode--inactive'}>
@@ -2144,6 +2282,7 @@ function PuzzleTable({
             <GamepadIcon />
           </div>
         ) : null}
+        {celebrating ? <WinCelebration label={messages.play.win} /> : null}
         <button
           type="button"
           className="button play-mode__leave"

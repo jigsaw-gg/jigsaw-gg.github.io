@@ -119,6 +119,7 @@ export interface Messages {
     handoverRight: string
     handoverLeft: string
     gamepad: string
+    win: string
   }
   errors: {
     appKeyMissing: string

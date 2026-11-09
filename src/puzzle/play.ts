@@ -409,6 +409,14 @@ export interface Camera {
   y: number
 }
 
+/** True when every piece shares one group (the assembled puzzle). */
+export function isPuzzleComplete(placements: readonly Placement[]): boolean {
+  if (placements.length === 0) return false
+  const group = placements[0]?.group
+  if (group === undefined) return false
+  return placements.every((piece) => piece.group === group)
+}
+
 export function pieceBounds(
   placements: Placement[],
   cellW: number,

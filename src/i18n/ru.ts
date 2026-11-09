@@ -137,6 +137,7 @@ export const ru: Messages = {
     handoverRight: 'Деталь переходит к правому большому пальцу',
     handoverLeft: 'Деталь переходит к левому большому пальцу',
     gamepad: 'Геймпад подключён',
+    win: 'Победа!',
   },
   errors: {
     appKeyMissing: 'Ключ приложения не задан.',

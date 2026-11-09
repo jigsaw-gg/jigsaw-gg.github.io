@@ -928,6 +928,159 @@ textarea.gamepad-focused,
   cursor: grabbing;
 }
 
+.play-viewport--won {
+  cursor: default;
+}
+
+.play-viewport--won .piece {
+  pointer-events: none;
+  cursor: default;
+}
+
+.win-celebration {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  grid-template-columns: minmax(3.5rem, 12vw) 1fr minmax(3.5rem, 12vw);
+  align-items: center;
+  pointer-events: none;
+  animation: win-celebration-fade 3.2s ease forwards;
+}
+
+.win-celebration__title {
+  margin: 0;
+  text-align: center;
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: clamp(3.5rem, 14vw, 7.5rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--text);
+  text-shadow:
+    0 2px 0 color-mix(in srgb, var(--bg) 70%, transparent),
+    0 10px 28px rgb(0 0 0 / 0.28);
+  animation: win-title-pop 3.2s ease forwards;
+}
+
+.win-celebration__side {
+  position: relative;
+  height: 100%;
+}
+
+.win-celebration__bit {
+  position: absolute;
+  left: 50%;
+  border-radius: 0.2rem;
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: win-bit-float 2.4s ease-in-out infinite;
+}
+
+.win-celebration__side--left .win-celebration__bit {
+  animation-name: win-bit-float-left;
+}
+
+.win-celebration__side--right .win-celebration__bit {
+  animation-name: win-bit-float-right;
+}
+
+.win-celebration__bit--0 {
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.win-celebration__bit--1 {
+  background: color-mix(in srgb, var(--accent) 55%, #e8b84a);
+  transform: translateX(-50%) rotate(28deg);
+}
+
+.win-celebration__bit--2 {
+  background: color-mix(in srgb, var(--text) 35%, var(--accent));
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+
+@keyframes win-celebration-fade {
+  0%,
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes win-title-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  22%,
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes win-bit-float-left {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: translateX(-50%) translateY(0.4rem) rotate(-8deg);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translateX(calc(-50% + 0.55rem)) translateY(-0.85rem)
+      rotate(12deg);
+  }
+}
+
+@keyframes win-bit-float-right {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: translateX(-50%) translateY(-0.35rem) rotate(10deg);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translateX(calc(-50% - 0.55rem)) translateY(0.75rem)
+      rotate(-14deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .win-celebration,
+  .win-celebration__title,
+  .win-celebration__bit {
+    animation: none;
+  }
+
+  .win-celebration {
+    opacity: 1;
+  }
+
+  .win-celebration__title {
+    opacity: 1;
+    transform: none;
+  }
+
+  .win-celebration__bit {
+    opacity: 0.7;
+  }
+}
+
 .play-world {
   position: absolute;
   top: 0;

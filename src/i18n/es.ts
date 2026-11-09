@@ -129,6 +129,7 @@ export const es: Messages = {
     handoverRight: 'La pieza pasa al pulgar derecho',
     handoverLeft: 'La pieza pasa al pulgar izquierdo',
     gamepad: 'Mando conectado',
+    win: '¡Victoria!',
   },
   errors: {
     appKeyMissing: 'La clave de la app no está configurada.',

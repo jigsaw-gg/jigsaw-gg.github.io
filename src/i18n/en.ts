@@ -128,6 +128,7 @@ export const en: Messages = {
     handoverRight: 'Passing the piece to the right thumb',
     handoverLeft: 'Passing the piece to the left thumb',
     gamepad: 'Controller connected',
+    win: 'WIN!',
   },
   errors: {
     appKeyMissing: 'App key is not set.',
