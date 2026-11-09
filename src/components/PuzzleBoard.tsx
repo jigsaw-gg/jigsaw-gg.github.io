@@ -350,6 +350,7 @@ function PuzzleTable({
     y: number
   } | null>(null)
   const [gamepadBlink, setGamepadBlink] = useState(false)
+  const [gamepadConnected, setGamepadConnected] = useState(false)
   const [gamepadHelpOpen, setGamepadHelpOpen] = useState(false)
   const [boardActive, setBoardActive] = useState(active)
   if (boardActive !== active) {
@@ -359,6 +360,7 @@ function PuzzleTable({
       setPadHoverGroup(null)
       setPadPointer(null)
       setGamepadBlink(false)
+      setGamepadConnected(false)
       setGamepadHelpOpen(false)
     }
   }
@@ -412,6 +414,7 @@ function PuzzleTable({
   const selectionRef = useRef<string | null>(null)
   const interestRef = useRef({ x: 0, y: 0 })
   const blinkRef = useRef(false)
+  const connectedRef = useRef(false)
   const helpOpenRef = useRef(false)
   const padClockRef = useRef({
     last: 0,
@@ -1737,7 +1740,16 @@ function PuzzleTable({
         ? 0
         : Math.min(0.05, Math.max(0, (now - clock.last) / 1000))
     clock.last = now
-    const { reading, receiving } = getGamepadState()
+    const { pad, reading, receiving } = getGamepadState()
+    const connected = pad !== null
+    if (connected !== connectedRef.current) {
+      connectedRef.current = connected
+      setGamepadConnected(connected)
+      if (!connected && helpOpenRef.current) {
+        helpOpenRef.current = false
+        setGamepadHelpOpen(false)
+      }
+    }
     if (receiving && !clock.latched) {
       clock.latched = true
       clock.showUntil = now + GAMEPAD_BLINK_MS
@@ -2310,13 +2322,13 @@ function PuzzleTable({
           </div>
         ) : null}
         {celebrating ? <WinCelebration label={messages.play.win} /> : null}
-        {gamepadHelpOpen ? null : (
+        {gamepadConnected && !gamepadHelpOpen ? (
           <div className="gamepad-help-cue" aria-hidden="true">
             <span>{messages.play.gamepadHelpCue}</span>
             <span className="gamepad-help-cue__sep">–</span>
             <TriangleGlyph className="gamepad-help-cue__glyph" />
           </div>
-        )}
+        ) : null}
         {gamepadHelpOpen ? (
           <div
             className="gamepad-help"
