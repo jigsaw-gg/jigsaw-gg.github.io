@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 export const GALLERY_IMAGE_URLS: readonly string[] = [
   'https://i.pinimg.com/1200x/9c/aa/eb/9caaeb6af14fed21ba25e5087479118a.jpg',
   'https://i.pinimg.com/1200x/ac/07/e2/ac07e23cd8fadc3ba79a44b82de759fd.jpg',
+  'https://cdnb.artstation.com/p/assets/images/images/060/752/177/large/egor-klyuchnyk-web-hd.jpg',
 ]
 
 export const DEFAULT_IMAGE_URL = GALLERY_IMAGE_URLS[1]
