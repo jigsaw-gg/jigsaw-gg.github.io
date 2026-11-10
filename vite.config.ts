@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { createHmac } from 'node:crypto'
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs'
+import { createHash, createHmac } from 'node:crypto'
+import { copyFileSync, mkdirSync, readFileSync, renameSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,6 +8,42 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { browserLogPlugin } from './dev/browserLogPlugin.ts'
 import { lanHttpsOptions } from './dev/devHttps.ts'
+
+const SHARE_IMAGE = 'share.png'
+const SHARE_IMAGE_HOST = 'https://jigsaw-gg.github.io'
+/** Content-hash prefix length for `share.<hash>.png` cache busting on Pages. */
+const SHARE_HASH_LEN = 6
+
+/**
+ * Hash `public/share.png`, emit `share.<prefix>.png`, and plant that name in
+ * absolute OG/Twitter image URLs. GitHub Pages (and Telegram previews) cache
+ * aggressively; a stable `/share.png` URL would keep showing a stale image.
+ */
+function shareImageCacheBust(): Plugin {
+  let hashedName = SHARE_IMAGE
+
+  return {
+    name: 'share-image-cache-bust',
+    apply: 'build',
+    buildStart() {
+      const source = resolve('public', SHARE_IMAGE)
+      const hash = createHash('sha256')
+        .update(readFileSync(source))
+        .digest('hex')
+        .slice(0, SHARE_HASH_LEN)
+      hashedName = `share.${hash}.png`
+    },
+    transformIndexHtml(html) {
+      const from = `${SHARE_IMAGE_HOST}/${SHARE_IMAGE}`
+      const to = `${SHARE_IMAGE_HOST}/${hashedName}`
+      return html.includes(from) ? html.replaceAll(from, to) : html
+    },
+    writeBundle() {
+      if (hashedName === SHARE_IMAGE) return
+      renameSync(resolve('dist', SHARE_IMAGE), resolve('dist', hashedName))
+    },
+  }
+}
 
 /**
  * GitHub Pages serves 404.html for unknown paths with status 404, which
@@ -301,6 +337,7 @@ export default defineConfig(({ mode }) => {
     server,
     plugins: [
       react(),
+      shareImageCacheBust(),
       githubPagesSpaFallback(),
       apinatorAuthPlugin(mode),
       browserLogPlugin(),
