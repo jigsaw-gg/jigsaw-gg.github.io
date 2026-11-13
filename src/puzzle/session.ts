@@ -1,4 +1,9 @@
 import { nanoid } from 'nanoid'
+import {
+  isPuzzleStorageExpired,
+  readTouchedAt,
+  SESSION_STORAGE_PREFIX,
+} from './storageTtl.ts'
 
 export const GALLERY_IMAGE_URLS: readonly string[] = [
   'https://i.pinimg.com/1200x/9c/aa/eb/9caaeb6af14fed21ba25e5087479118a.jpg',
@@ -78,14 +83,28 @@ export function parseSetup(data: unknown): PuzzleSetup | null {
 }
 
 function storageKey(sessionId: string): string {
-  return `jigsaw-session:${sessionId}`
+  return `${SESSION_STORAGE_PREFIX}${sessionId}`
 }
 
 export function readSession(sessionId: string): PuzzleSetup | null {
   try {
-    const raw = localStorage.getItem(storageKey(sessionId))
+    const key = storageKey(sessionId)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
-    return parseSetup(JSON.parse(raw) as unknown)
+    const parsed = JSON.parse(raw) as unknown
+    const setup = parseSetup(parsed)
+    if (!setup) {
+      localStorage.removeItem(key)
+      return null
+    }
+    const now = Date.now()
+    const touchedAt = readTouchedAt(parsed)
+    if (touchedAt !== null && isPuzzleStorageExpired(touchedAt, now)) {
+      localStorage.removeItem(key)
+      return null
+    }
+    localStorage.setItem(key, JSON.stringify({ ...setup, touchedAt: now }))
+    return setup
   } catch {
     return null
   }
@@ -93,7 +112,34 @@ export function readSession(sessionId: string): PuzzleSetup | null {
 
 export function writeSession(sessionId: string, setup: PuzzleSetup): void {
   try {
-    localStorage.setItem(storageKey(sessionId), JSON.stringify(setup))
+    localStorage.setItem(
+      storageKey(sessionId),
+      JSON.stringify({ ...setup, touchedAt: Date.now() }),
+    )
+  } catch {
+    // ignore quota / privacy mode errors
+  }
+}
+
+/** Keep the session cache alive while the matching world is still in use. */
+export function touchSession(sessionId: string): void {
+  try {
+    const key = storageKey(sessionId)
+    const raw = localStorage.getItem(key)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as unknown
+    const setup = parseSetup(parsed)
+    if (!setup) {
+      localStorage.removeItem(key)
+      return
+    }
+    const now = Date.now()
+    const touchedAt = readTouchedAt(parsed)
+    if (touchedAt !== null && isPuzzleStorageExpired(touchedAt, now)) {
+      localStorage.removeItem(key)
+      return
+    }
+    localStorage.setItem(key, JSON.stringify({ ...setup, touchedAt: now }))
   } catch {
     // ignore quota / privacy mode errors
   }

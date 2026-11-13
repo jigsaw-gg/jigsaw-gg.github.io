@@ -1,6 +1,11 @@
 import type { Placement } from './play.ts'
-import type { PuzzleSetup } from './session.ts'
+import { touchSession, type PuzzleSetup } from './session.ts'
 import { dequantize, quantize } from './kinematics.ts'
+import {
+  isPuzzleStorageExpired,
+  readTouchedAt,
+  WORLD_STORAGE_PREFIX,
+} from './storageTtl.ts'
 
 /**
  * Lowest live player id is the host. Every peer computes that from the same
@@ -358,10 +363,34 @@ interface StoredWorld {
   rev: number
   authorId: string
   data: number[]
+  touchedAt: number
 }
 
 function storageKey(sessionId: string, setup: PuzzleSetup): string {
-  return `jigsaw-world:${sessionId}:${setup.seed}:${setup.pieceCount}:${setup.imageWidth}x${setup.imageHeight}`
+  return `${WORLD_STORAGE_PREFIX}${sessionId}:${setup.seed}:${setup.pieceCount}:${setup.imageWidth}x${setup.imageHeight}`
+}
+
+function parseStoredWorld(
+  value: unknown,
+): Omit<StoredWorld, 'touchedAt'> | null {
+  if (typeof value !== 'object' || value === null) return null
+  const parsed = value as Partial<StoredWorld>
+  if (parsed.v !== 1 || !Array.isArray(parsed.data)) return null
+  if (
+    typeof parsed.rev !== 'number' ||
+    !Number.isInteger(parsed.rev) ||
+    parsed.rev < 1
+  ) {
+    return null
+  }
+  if (typeof parsed.authorId !== 'string') return null
+  if (parsed.data.some((item) => typeof item !== 'number')) return null
+  return {
+    v: 1,
+    rev: parsed.rev,
+    authorId: parsed.authorId,
+    data: parsed.data,
+  }
 }
 
 export function readStoredWorld(
@@ -369,23 +398,28 @@ export function readStoredWorld(
   setup: PuzzleSetup,
 ): { rev: number; authorId: string; data: number[] } | null {
   try {
-    const raw = localStorage.getItem(storageKey(sessionId, setup))
+    const key = storageKey(sessionId, setup)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<StoredWorld>
-    if (parsed.v !== 1 || !Array.isArray(parsed.data)) return null
-    if (
-      typeof parsed.rev !== 'number' ||
-      !Number.isInteger(parsed.rev) ||
-      parsed.rev < 1
-    ) {
+    const parsed = JSON.parse(raw) as unknown
+    const world = parseStoredWorld(parsed)
+    if (!world) {
+      localStorage.removeItem(key)
       return null
     }
-    if (typeof parsed.authorId !== 'string') return null
-    if (parsed.data.some((item) => typeof item !== 'number')) return null
+    const now = Date.now()
+    const touchedAt = readTouchedAt(parsed)
+    if (touchedAt !== null && isPuzzleStorageExpired(touchedAt, now)) {
+      localStorage.removeItem(key)
+      return null
+    }
+    const stored: StoredWorld = { ...world, touchedAt: now }
+    localStorage.setItem(key, JSON.stringify(stored))
+    touchSession(sessionId)
     return {
-      rev: parsed.rev,
-      authorId: parsed.authorId,
-      data: parsed.data,
+      rev: world.rev,
+      authorId: world.authorId,
+      data: world.data,
     }
   } catch {
     return null
@@ -400,9 +434,16 @@ export function writeStoredWorld(
   data: readonly number[],
 ): void {
   if (rev < 1) return
-  const stored: StoredWorld = { v: 1, rev, authorId, data: [...data] }
+  const stored: StoredWorld = {
+    v: 1,
+    rev,
+    authorId,
+    data: [...data],
+    touchedAt: Date.now(),
+  }
   try {
     localStorage.setItem(storageKey(sessionId, setup), JSON.stringify(stored))
+    touchSession(sessionId)
   } catch {
     // ignore quota / privacy mode errors
   }

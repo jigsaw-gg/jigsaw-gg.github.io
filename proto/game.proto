@@ -1,0 +1,406 @@
+syntax = "proto3";
+
+package game.v1;
+
+option java_multiple_files = true;
+
+// =============================================================================
+// Transport binding (best case → fallbacks)
+//
+// Best case: WebTransport over QUIC (UDP). After JoinGame, the client opens
+// TWO bidirectional QUIC streams on that session (not datagrams, not peer relay):
+//
+//   1) input stream  — player intent uplink + low-latency control downlink
+//   2) world stream  — authoritative tick / presence downlink + light uplink
+//
+// Wire framing on each stream: repeated `u32 BE length` + `StreamFrame` bytes.
+// `GameSync.Play` is the logical bidi contract those streams implement; on
+// WebTransport the two streams carry the same messages partitioned by
+// StreamFrame.stream (see StreamKind). Fallbacks (WebSocket bidi, or a single
+// Connect/gRPC Play RPC over TCP) multiplex both kinds on one bidi pipe.
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Lobby / durable game definition (unary RPCs over Connect/gRPC HTTP).
+// Source of truth for CreateGame lives on the server with GAME_TTL (24h of
+// inactivity). expires_at advances on Create/Join/heartbeat/accepted play input.
+// Live play rooms are separate: JoinGame creates the in-memory room if missing.
+// ---------------------------------------------------------------------------
+service GameSession {
+  // Creator-only. Registers puzzle setup under game_id; starts 24h inactivity TTL.
+  // If game_id is empty, server assigns a NanoID-compatible id.
+  // Fails if game_id already exists with different setup.
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse);
+
+  // Read setup + expiry without joining the live room.
+  rpc GetGame(GetGameRequest) returns (GetGameResponse);
+
+  // Enter (or create) the live room for an existing game_id.
+  // Returns authoritative setup + PlayEndpoints for the UDP play session.
+  // Does not create the durable definition — call CreateGame first.
+  rpc JoinGame(JoinGameRequest) returns (JoinGameResponse);
+
+  // Explicit leave. Heartbeat timeout also removes the player.
+  rpc LeaveGame(LeaveGameRequest) returns (LeaveGameResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Realtime play — logical bidirectional streaming API.
+//
+// Best case (UDP / WebTransport): realized as two QUIC bidirectional streams
+// (input + world). Each direction carries length-prefixed StreamFrame messages.
+// Fallback: one multiplexed bidi pipe (WebSocket or Connect Play) with the
+// same StreamFrame framing.
+// ---------------------------------------------------------------------------
+service GameSync {
+  rpc Play(stream StreamFrame) returns (stream StreamFrame);
+}
+
+// Which QUIC bidi stream a frame belongs on (best-case WebTransport).
+enum StreamKind {
+  STREAM_KIND_UNSPECIFIED = 0;
+  // Client→server: Heartbeat, CursorUpdate, Claim, Release, MoveHeld, Merge, Rename.
+  // Server→client: ClaimResult, MergeResult, HeartbeatAck, urgent GameEvent.
+  STREAM_KIND_INPUT = 1;
+  // Server→client: Welcome, Tick (~10 Hz), PresenceUpdate, non-urgent GameEvent.
+  // Client→server: ResyncRequest / StreamPace only (keep uplink thin).
+  STREAM_KIND_WORLD = 2;
+}
+
+// Length-prefixed unit on every play stream (UDP WT bidi or fallback pipe).
+message StreamFrame {
+  StreamKind stream = 1;
+  uint64 seq = 2;
+  int64 time_ms = 3;
+  oneof body {
+    ClientEnvelope client = 10;
+    ServerEnvelope server = 11;
+  }
+}
+
+// ===== Lobby messages =======================================================
+
+message PuzzleSetup {
+  string image_url = 1;
+  uint32 image_width = 2;
+  uint32 image_height = 3;
+  // Requested piece budget; actual grid is cols*rows from server/client cut.
+  uint32 piece_count = 4;
+  uint32 seed = 5;
+}
+
+message CreateGameRequest {
+  // Optional; empty → server assigns. Client invite links use this id.
+  string game_id = 1;
+  string creator_player_id = 2;
+  string creator_display_name = 3;
+  PuzzleSetup setup = 4;
+}
+
+message CreateGameResponse {
+  string game_id = 1;
+  PuzzleSetup setup = 2;
+  int64 created_at_ms = 3;
+  int64 expires_at_ms = 4;
+  // cols/rows the server will use for piece indices (deterministic from setup).
+  uint32 cols = 5;
+  uint32 rows = 6;
+}
+
+message GetGameRequest {
+  string game_id = 1;
+}
+
+message GetGameResponse {
+  string game_id = 1;
+  PuzzleSetup setup = 2;
+  int64 created_at_ms = 3;
+  int64 expires_at_ms = 4;
+  uint32 cols = 5;
+  uint32 rows = 6;
+  string creator_player_id = 7;
+  bool expired = 8;
+}
+
+message JoinGameRequest {
+  string game_id = 1;
+  string player_id = 2;
+  string display_name = 3;
+  TransportPreference preferred_transport = 4;
+}
+
+message JoinGameResponse {
+  string game_id = 1;
+  string player_id = 2;
+  PuzzleSetup setup = 3;
+  uint32 cols = 4;
+  uint32 rows = 5;
+  int64 server_time_ms = 6;
+  int64 expires_at_ms = 7;
+  // Full board snapshot so late joiners do not wait for ticks.
+  BoardSnapshot board = 8;
+  repeated PlayerInfo players = 9;
+  // Where to open the UDP (WebTransport) play streams; WS is fallback only.
+  PlayEndpoints play = 10;
+  TransportKind negotiated_transport = 11;
+}
+
+// Best case is always WebTransport (QUIC/UDP) when the client can dial it.
+message PlayEndpoints {
+  // e.g. https://host:31100/game?game_id=…&player_id=…
+  string webtransport_url = 1;
+  // Fallback bidi pipe, e.g. ws://host:21100/game?game_id=…&player_id=…
+  string websocket_url = 2;
+}
+
+message LeaveGameRequest {
+  string game_id = 1;
+  string player_id = 2;
+}
+
+message LeaveGameResponse {}
+
+message PlayerInfo {
+  string player_id = 1;
+  string display_name = 2;
+  bool online = 3;
+}
+
+enum TransportPreference {
+  TRANSPORT_PREFERENCE_UNSPECIFIED = 0;
+  // Best case: QUIC over UDP with two bidirectional play streams.
+  TRANSPORT_PREFERENCE_WEBTRANSPORT = 1;
+  TRANSPORT_PREFERENCE_WEBSOCKET = 2;
+  // Try WebTransport first, then WebSocket.
+  TRANSPORT_PREFERENCE_AUTO = 3;
+}
+
+enum TransportKind {
+  TRANSPORT_KIND_UNSPECIFIED = 0;
+  TRANSPORT_KIND_WEBTRANSPORT = 1;
+  TRANSPORT_KIND_WEBSOCKET = 2;
+}
+
+// ===== Board / pieces =======================================================
+
+// Piece identity is row-major index: index = row * cols + col.
+// Group id is the piece index of the group representative (same as today's
+// client `group` field mapped through pieceIndex).
+
+message PieceState {
+  uint32 piece_index = 1;
+  // Quantized board coordinates (same scale as client MOTION_Q = 32).
+  int32 x_q = 2;
+  int32 y_q = 3;
+  uint32 group_id = 4;
+  uint32 rev = 5;
+}
+
+message BoardSnapshot {
+  uint64 board_rev = 1;
+  repeated PieceState pieces = 2;
+}
+
+message HeldGroup {
+  string player_id = 1;
+  uint32 anchor_piece_index = 2;
+  uint32 group_id = 3;
+  repeated uint32 member_piece_indices = 4;
+}
+
+// ===== Motion (client compression + server repair share this shape) =========
+
+// Mirrors src/puzzle/kinematics.ts MotionPacket after encodeMotion.
+message MotionSample {
+  bool hide = 1;
+  bool anchor = 2;
+  bool absolute = 3;
+  int32 x_q = 4;
+  int32 y_q = 5;
+  // Milliseconds since previous knot (sender clock).
+  uint32 dt_ms = 6;
+  int32 vx_q = 7;
+  int32 vy_q = 8;
+  int32 ax_q = 9;
+  int32 ay_q = 10;
+  // Client send timestamp (performance.now-style ms, monotonic per client).
+  uint32 client_time_ms = 11;
+}
+
+// ===== Client → server ======================================================
+
+message ClientEnvelope {
+  string game_id = 1;
+  string player_id = 2;
+  uint64 seq = 3;
+  int64 client_time_ms = 4;
+  oneof body {
+    Heartbeat heartbeat = 10;
+    CursorUpdate cursor = 11;
+    ClaimControl claim = 12;
+    ReleaseControl release = 13;
+    MoveHeld move_held = 14;
+    MergeGroups merge = 15;
+    RenamePlayer rename = 16;
+    // World-stream uplink only (best-case WT).
+    ResyncRequest resync = 17;
+    StreamPace pace = 18;
+  }
+}
+
+// Ask server for the next Tick with resync=true on the world stream.
+message ResyncRequest {
+  uint64 last_tick_id = 1;
+  uint64 last_board_rev = 2;
+}
+
+// Optional backpressure hint on the world stream (client display buffer depth).
+message StreamPace {
+  uint32 buffered_tick_count = 1;
+}
+
+message Heartbeat {
+  // Optional RTT probe token; echoed in Tick or HeartbeatAck.
+  string nonce = 1;
+}
+
+message CursorUpdate {
+  MotionSample motion = 1;
+}
+
+// First-come-first-served. Server grants a subset (possibly empty).
+message ClaimControl {
+  repeated uint32 piece_indices = 1;
+  // Preferred anchor among the claimed set.
+  uint32 anchor_piece_index = 2;
+  uint64 client_claim_id = 3;
+}
+
+message ReleaseControl {
+  // Empty → release everything this player holds.
+  repeated uint32 piece_indices = 1;
+  // Final resting pose for released pieces (authoritative commit).
+  repeated PieceState final_poses = 2;
+}
+
+message MoveHeld {
+  uint32 anchor_piece_index = 1;
+  uint32 group_id = 2;
+  // Members omitted on most samples; include every Nth or on claim change.
+  repeated uint32 member_piece_indices = 3;
+  MotionSample motion = 4;
+}
+
+// Join one held group (or free group) onto another. Server validates geometry
+// / ownership and either applies or rejects.
+message MergeGroups {
+  uint32 moving_group_id = 1;
+  uint32 target_group_id = 2;
+  // Optional explicit member lists when client is unsure of server grouping.
+  repeated uint32 moving_member_indices = 3;
+  repeated uint32 target_member_indices = 4;
+  // Pose of moving group at merge attempt (anchor quantized).
+  int32 moving_anchor_x_q = 5;
+  int32 moving_anchor_y_q = 6;
+  uint64 client_merge_id = 7;
+}
+
+message RenamePlayer {
+  string display_name = 1;
+}
+
+// ===== Server → client ======================================================
+
+message ServerEnvelope {
+  string game_id = 1;
+  uint64 seq = 2;
+  int64 server_time_ms = 3;
+  oneof body {
+    Welcome welcome = 10;
+    Tick tick = 11;
+    ClaimResult claim_result = 12;
+    MergeResult merge_result = 13;
+    PresenceUpdate presence = 14;
+    GameEvent game_event = 15;
+    HeartbeatAck heartbeat_ack = 16;
+  }
+}
+
+message Welcome {
+  string player_id = 1;
+  BoardSnapshot board = 2;
+  repeated PlayerInfo players = 3;
+  repeated HeldGroup holdings = 4;
+  uint32 tick_hz = 5;
+  uint32 heartbeat_timeout_ms = 6;
+  // True when this session uses two QUIC bidi streams (input + world).
+  bool dual_bidi_streams = 7;
+  TransportKind transport = 8;
+}
+
+// Fixed-rate (~10 Hz) consolidated world view after conflict resolution and
+// server-side motion repair.
+message Tick {
+  uint64 tick_id = 1;
+  uint64 board_rev = 2;
+  repeated PlayerPose players = 3;
+  // Only pieces that changed since last tick (or full set when resync=true).
+  repeated PieceState piece_deltas = 4;
+  repeated HeldGroup holdings = 5;
+  bool resync = 6;
+}
+
+message PlayerPose {
+  string player_id = 1;
+  // Server-smoothed cursor (after glitch repair). hide ⇒ not rendered.
+  MotionSample cursor = 2;
+  // Server-smoothed held-group anchor pose when holding.
+  MotionSample held = 3;
+  uint32 held_anchor_piece_index = 4;
+  uint32 held_group_id = 5;
+  repeated uint32 held_member_indices = 6;
+}
+
+message ClaimResult {
+  uint64 client_claim_id = 1;
+  bool accepted = 2;
+  // Pieces actually granted (FCFS); may be a subset of the request.
+  repeated uint32 granted_piece_indices = 3;
+  // Pieces denied because another player already holds them.
+  repeated uint32 denied_piece_indices = 4;
+  string holder_player_id = 5;
+}
+
+message MergeResult {
+  uint64 client_merge_id = 1;
+  bool accepted = 2;
+  uint32 resulting_group_id = 3;
+  repeated uint32 member_piece_indices = 4;
+  BoardSnapshot board = 5;
+  string reject_reason = 6;
+}
+
+message PresenceUpdate {
+  repeated PlayerInfo players = 1;
+  // Players removed due to heartbeat timeout or LeaveGame.
+  repeated string removed_player_ids = 2;
+}
+
+message GameEvent {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_GAME_EXPIRED = 1;
+    KIND_ROOM_CLOSED = 2;
+    KIND_FORCE_RELEASE = 3;
+    KIND_RESYNC_REQUIRED = 4;
+  }
+  Kind kind = 1;
+  string message = 2;
+  repeated uint32 released_piece_indices = 3;
+  BoardSnapshot board = 4;
+}
+
+message HeartbeatAck {
+  string nonce = 1;
+  int64 server_time_ms = 2;
+}

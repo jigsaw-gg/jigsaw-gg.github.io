@@ -13,8 +13,10 @@ import {
   readThemePreference,
   resolveTheme,
 } from './theme.ts'
+import { purgeExpiredPuzzleStorage } from './puzzle/storageTtl.ts'
 import './index.css'
 
+purgeExpiredPuzzleStorage()
 bootstrapTelegramWebApp()
 if (readThemePreference() === 'system') {
   const telegramTheme = readTelegramColorScheme()
