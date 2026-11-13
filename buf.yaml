@@ -1,0 +1,4 @@
+# Buf module for jigsaw-gg-server control-plane protos (copied into proto/).
+version: v2
+modules:
+  - path: proto

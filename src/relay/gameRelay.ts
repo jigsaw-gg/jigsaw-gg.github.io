@@ -1,3 +1,10 @@
+import { create, fromBinary, toBinary } from '@bufbuild/protobuf'
+import {
+  PingRequestSchema,
+  PongResponseSchema,
+  type PingRequest,
+  type PongResponse,
+} from '../gen/relay_pb.ts'
 import {
   RELAY_ROOM,
   RELAY_WEBSOCKET_URL,
@@ -14,7 +21,6 @@ const MAX_MESSAGES = 40
 const AUTO_PING_MS = 1000
 const WT_CONNECT_TIMEOUT_MS = 4000
 
-const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
 const listeners = new Set<() => void>()
@@ -114,16 +120,76 @@ function closeSockets(): void {
   pendingPing = null
 }
 
-async function payloadToText(data: unknown): Promise<string> {
-  if (typeof data === 'string') return data
-  if (data instanceof Blob) return data.text()
-  if (data instanceof ArrayBuffer) return decoder.decode(data)
+function bytesFromPayload(data: unknown): Uint8Array | null {
+  if (data instanceof ArrayBuffer) return new Uint8Array(data)
   if (ArrayBuffer.isView(data)) {
-    return decoder.decode(
-      new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-    )
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
   }
-  return String(data)
+  return null
+}
+
+async function payloadToBytes(data: unknown): Promise<Uint8Array | null> {
+  const direct = bytesFromPayload(data)
+  if (direct) return direct
+  if (data instanceof Blob) return new Uint8Array(await data.arrayBuffer())
+  if (typeof data === 'string') return new TextEncoder().encode(data)
+  return null
+}
+
+function formatBytesPreview(bytes: Uint8Array): string {
+  try {
+    return decoder.decode(bytes)
+  } catch {
+    return `<${bytes.byteLength} bytes>`
+  }
+}
+
+function formatPing(nonce: string): string {
+  return `PingRequest { nonce: ${JSON.stringify(nonce)} }`
+}
+
+function formatPong(nonce: string, serverTimeMs: bigint): string {
+  return `PongResponse { nonce: ${JSON.stringify(nonce)}, serverTimeMs: ${serverTimeMs.toString()} }`
+}
+
+function encodePing(nonce: string): Uint8Array {
+  return toBinary(PingRequestSchema, create(PingRequestSchema, { nonce }))
+}
+
+function encodePong(
+  nonce: string,
+  serverTimeMs = BigInt(Date.now()),
+): {
+  bytes: Uint8Array
+  pong: PongResponse
+} {
+  const pong = create(PongResponseSchema, { nonce, serverTimeMs })
+  return { bytes: toBinary(PongResponseSchema, pong), pong }
+}
+
+function tryDecodePing(bytes: Uint8Array): PingRequest | null {
+  try {
+    const ping = fromBinary(PingRequestSchema, bytes)
+    if (!ping.nonce) return null
+    // PongResponse shares field 1 (nonce). Reject frames that carry field 2
+    // (server_time_ms), which only PongResponse sets on the wire.
+    const asPong = fromBinary(PongResponseSchema, bytes)
+    if (asPong.serverTimeMs !== 0n) return null
+    return ping
+  } catch {
+    return null
+  }
+}
+
+function tryDecodePong(bytes: Uint8Array): PongResponse | null {
+  try {
+    const pong = fromBinary(PongResponseSchema, bytes)
+    // PingRequest decodes as Pong with serverTimeMs=0; require a real pong.
+    if (!pong.nonce || pong.serverTimeMs === 0n) return null
+    return pong
+  } catch {
+    return null
+  }
 }
 
 function supportsWebTransport(): boolean {
@@ -136,25 +202,30 @@ function withClientId(url: string, clientId: string): string {
   return parsed.toString()
 }
 
-function finishPing(nonce: string, replyText: string): void {
-  if (!pendingPing || pendingPing.nonce !== nonce) return
+function finishPing(pong: PongResponse): void {
+  if (!pendingPing || pendingPing.nonce !== pong.nonce) return
   const latencyMs = Math.round(performance.now() - pendingPing.sentAt)
   pendingPing = null
-  pushLog('in', replyText)
+  pushLog('in', formatPong(pong.nonce, pong.serverTimeMs))
   commit({ latencyMs })
+}
+
+/** Copy into a standalone ArrayBuffer view for WebSocket / WebTransport writers. */
+function asWritableBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(bytes)
 }
 
 async function sendDatagram(
   writer: WritableStreamDefaultWriter<Uint8Array>,
-  text: string,
+  bytes: Uint8Array,
 ): Promise<void> {
-  await writer.write(encoder.encode(text))
+  await writer.write(asWritableBytes(bytes))
 }
 
 async function pumpDatagrams(
   transport: WebTransport,
   gen: number,
-  onText: (text: string) => void | Promise<void>,
+  onBytes: (bytes: Uint8Array) => void | Promise<void>,
 ): Promise<void> {
   const reader = transport.datagrams.readable.getReader()
   try {
@@ -162,7 +233,7 @@ async function pumpDatagrams(
       const { value, done } = await reader.read()
       if (done) break
       if (!value) continue
-      await onText(decoder.decode(value))
+      await onBytes(value)
     }
   } catch {
     /* transport closed or reset */
@@ -193,18 +264,18 @@ async function waitForWebTransportReady(
 async function pingWebTransport(): Promise<void> {
   if (!datagramWriter) throw new Error('WebTransport datagram writer missing')
   const nonce = crypto.randomUUID().slice(0, 8)
-  const frame = `ping ${nonce}`
+  const frame = encodePing(nonce)
   pendingPing = { nonce, sentAt: performance.now() }
-  pushLog('out', frame)
+  pushLog('out', formatPing(nonce))
   await sendDatagram(datagramWriter, frame)
 }
 
 function pingWebSocket(socket: WebSocket): void {
   const nonce = crypto.randomUUID().slice(0, 8)
-  const frame = `ping ${nonce}`
+  const frame = encodePing(nonce)
   pendingPing = { nonce, sentAt: performance.now() }
-  pushLog('out', frame)
-  socket.send(frame)
+  pushLog('out', formatPing(nonce))
+  socket.send(asWritableBytes(frame))
 }
 
 async function connectWebTransport(gen: number): Promise<boolean> {
@@ -260,14 +331,15 @@ async function connectWebTransport(gen: number): Promise<boolean> {
   datagramWriter = primary.datagrams.writable.getWriter()
 
   // Relay does not echo to the sender. A second WT session in the same room
-  // answers application pings over datagrams (UDP-like) for RTT.
-  void pumpDatagrams(echo, gen, async (text) => {
-    if (!text.startsWith('ping ')) return
-    const reply = `pong ${text.slice('ping '.length)}`
+  // answers protobuf PingRequest datagrams for RTT.
+  void pumpDatagrams(echo, gen, async (bytes) => {
+    const ping = tryDecodePing(bytes)
+    if (!ping) return
+    const { bytes: reply, pong } = encodePong(ping.nonce)
     const writer = echo.datagrams.writable.getWriter()
     try {
       await sendDatagram(writer, reply)
-      pushLog('info', `echo → ${reply}`)
+      pushLog('info', `echo → ${formatPong(pong.nonce, pong.serverTimeMs)}`)
     } finally {
       try {
         writer.releaseLock()
@@ -277,12 +349,13 @@ async function connectWebTransport(gen: number): Promise<boolean> {
     }
   })
 
-  void pumpDatagrams(primary, gen, (text) => {
-    if (text.startsWith('pong ')) {
-      finishPing(text.slice('pong '.length).trim(), text)
+  void pumpDatagrams(primary, gen, (bytes) => {
+    const pong = tryDecodePong(bytes)
+    if (pong) {
+      finishPing(pong)
       return
     }
-    pushLog('in', text)
+    pushLog('in', formatBytesPreview(bytes))
   })
 
   void primary.closed
@@ -307,7 +380,7 @@ async function connectWebTransport(gen: number): Promise<boolean> {
   setStatus('connected')
   pushLog(
     'info',
-    `WebTransport connected (QUIC datagrams; room=${RELAY_ROOM}; echo peer for ping/pong)`,
+    `WebTransport connected (QUIC datagrams; room=${RELAY_ROOM}; echo peer for PingRequest/PongResponse)`,
   )
   return true
 }
@@ -378,26 +451,32 @@ async function connectWebSocket(gen: number): Promise<boolean> {
   }
 
   // Relay does not echo to the sender. A second socket in the same room
-  // answers application pings so we can measure RTT without gRPC.
+  // answers protobuf PingRequest frames for RTT.
   echo.addEventListener('message', (event) => {
     void (async () => {
-      const text = await payloadToText(event.data)
-      if (!text.startsWith('ping ')) return
-      const reply = `pong ${text.slice('ping '.length)}`
-      echo.send(reply)
-      pushLog('info', `echo → ${reply}`)
+      const bytes = await payloadToBytes(event.data)
+      if (!bytes) return
+      const ping = tryDecodePing(bytes)
+      if (!ping) return
+      const { bytes: reply, pong } = encodePong(ping.nonce)
+      echo.send(asWritableBytes(reply))
+      pushLog('info', `echo → ${formatPong(pong.nonce, pong.serverTimeMs)}`)
     })()
   })
 
   primary.addEventListener('message', (event) => {
     void (async () => {
-      const text = await payloadToText(event.data)
-      if (text.startsWith('pong ')) {
-        const nonce = text.slice('pong '.length).trim()
-        finishPing(nonce, text)
+      const bytes = await payloadToBytes(event.data)
+      if (!bytes) {
+        pushLog('in', String(event.data))
         return
       }
-      pushLog('in', text)
+      const pong = tryDecodePong(bytes)
+      if (pong) {
+        finishPing(pong)
+        return
+      }
+      pushLog('in', formatBytesPreview(bytes))
     })()
   })
 
@@ -416,7 +495,7 @@ async function connectWebSocket(gen: number): Promise<boolean> {
   setStatus('connected')
   pushLog(
     'info',
-    `WebSocket connected (room=${RELAY_ROOM}; echo peer for ping/pong)`,
+    `WebSocket connected (room=${RELAY_ROOM}; echo peer for PingRequest/PongResponse)`,
   )
   return true
 }

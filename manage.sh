@@ -37,6 +37,11 @@ elif [[ "$1" == "run-mcp-stdio" ]]; then
     LAST_PIPE_STATUS=${PIPESTATUS[0]}
     exit $LAST_PIPE_STATUS
 
+elif [[ "$1" == "gen-proto" ]]; then
+    shift
+    bash "$ROOT_DIRECTORY_FULL_PATH/scripts/gen-proto.sh" "$@"
+    exit $?
+
 else
     echo "Unknown command: $1"
     exit 1
