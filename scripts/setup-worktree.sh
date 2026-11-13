@@ -7,6 +7,10 @@ if [[ -n "${ROOT_WORKTREE_PATH:-}" && ! -e config.json && -f "${ROOT_WORKTREE_PA
   cp "${ROOT_WORKTREE_PATH}/config.json" config.json
 fi
 
+if [[ -n "${ROOT_WORKTREE_PATH:-}" && ! -e .env && -f "${ROOT_WORKTREE_PATH}/.env" ]]; then
+  cp "${ROOT_WORKTREE_PATH}/.env" .env
+fi
+
 if [[ -f .worktree-port ]]; then
   echo "worktree dev port $(tr -d '[:space:]' < .worktree-port)"
 else
