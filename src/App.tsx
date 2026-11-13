@@ -15,6 +15,7 @@ import { PuzzlesPage } from './pages/PuzzlesPage.tsx'
 import { normalizeSessionId, playInvitePath } from './puzzle/session.ts'
 import { TelegramUi } from './telegram/TelegramUi.tsx'
 import { useApinatorStatus } from './useApinatorStatus.ts'
+import './relay/gameRelay.ts'
 import './App.css'
 
 function PlayInviteRoute() {

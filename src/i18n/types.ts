@@ -58,6 +58,23 @@ export interface Messages {
     telegramDebug: string
     telegramUrlParams: string
     telegramUrlParamsEmpty: string
+    relayTitle: string
+    relayTransport: string
+    relayStatus: string
+    relayLatency: string
+    relayLatencyNone: string
+    relayWebTransportUrl: string
+    relayWebSocketUrl: string
+    relayAutoPing: string
+    relaySendPing: string
+    relayReconnect: string
+    relayLog: string
+    relayLogEmpty: string
+    relayStatusConnecting: string
+    relayStatusConnected: string
+    relayStatusDisconnected: string
+    relayStatusFailed: string
+    relayTransportNone: string
   }
   puzzles: {
     title: string

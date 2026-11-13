@@ -7,6 +7,10 @@ interface ImportMetaEnv {
   readonly VITE_TELEGRAM_MINI_APP_SHORT_NAME?: string
   /** Human-readable Mini App title from BotFather. */
   readonly VITE_TELEGRAM_MINI_APP_TITLE?: string
+  /** WebTransport (QUIC/UDP) relay URL. */
+  readonly VITE_RELAY_WEBTRANSPORT_URL?: string
+  /** WebSocket fallback relay URL. */
+  readonly VITE_RELAY_WEBSOCKET_URL?: string
   /** First 6 characters of the commit planted by the Pages build. */
   readonly VITE_BUILD_COMMIT: string
   /** `git log -1` text planted beside the short commit. */

@@ -411,6 +411,31 @@
   line-height: 1.5;
 }
 
+.about-relay {
+  margin: 1.5rem 0;
+}
+
+.about-relay__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+
+.about-relay__auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.about-relay__log {
+  max-height: 16rem;
+  overflow: auto;
+}
+
 .about-telegram {
   margin-top: 1.5rem;
 }
