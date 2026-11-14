@@ -271,9 +271,10 @@ export function useGameWorld(
             let smooth = remoteCursorSmoothRef.current.get(pose.playerId)
             if (!smooth) {
               smooth = new MousePathSmoother({
-                cruiseSpeed: 1800,
-                catchUpSec: 0.07,
-                catchUpAccel: 36_000,
+                renderDelayMs: 200,
+                cruiseSpeed: 1200,
+                catchUpSec: 0.12,
+                catchUpAccel: 14_000,
               })
               remoteCursorSmoothRef.current.set(pose.playerId, smooth)
             }
@@ -353,7 +354,9 @@ export function useGameWorld(
         if (pose?.held && !pose.held.hide) {
           let smooth = remoteHeldSmoothRef.current.get(playerId)
           if (!smooth) {
-            smooth = new MousePathSmoother()
+            // Same intentional render lag as cursors — chase delayed history,
+            // not a projected "now" pose.
+            smooth = new MousePathSmoother({ renderDelayMs: 160 })
             remoteHeldSmoothRef.current.set(playerId, smooth)
           }
           smooth.setTarget(x, y)
@@ -685,17 +688,19 @@ export function useGameWorld(
       for (const [id, cursor] of remoteCursorRef.current) {
         if (cursor.hide) continue
         const smooth = remoteCursorSmoothRef.current.get(id)
-        const pose = smooth?.step(dtSec) ?? { x: cursor.x, y: cursor.y }
+        const pose = smooth?.step(dtSec, now) ?? { x: cursor.x, y: cursor.y }
         const lastOtel = lastRemoteCursorOtelAt.get(id) ?? 0
         if (now - lastOtel >= CURSOR_OTEL_MIN_MS) {
           lastRemoteCursorOtelAt.set(id, now)
+          const delayed = smooth?.delayedTarget()
           event('input', 'cursor.remote', {
             'jigsaw.game.id': sessionId,
             remotePlayerId: id,
             x: Math.round(pose.x * 10) / 10,
             y: Math.round(pose.y * 10) / 10,
-            targetX: Math.round(cursor.x * 10) / 10,
-            targetY: Math.round(cursor.y * 10) / 10,
+            // Delayed chase point (what we paint toward), not the newest tick.
+            targetX: Math.round((delayed?.x ?? cursor.x) * 10) / 10,
+            targetY: Math.round((delayed?.y ?? cursor.y) * 10) / 10,
           })
         }
         nextCursors.push({
@@ -720,7 +725,7 @@ export function useGameWorld(
         const anchor = composed.find((p) => p.id === held.anchorId)
         if (!anchor) continue
         const smooth = remoteHeldSmoothRef.current.get(playerId)
-        const pose = smooth?.step(dtSec) ?? { x: held.x, y: held.y }
+        const pose = smooth?.step(dtSec, now) ?? { x: held.x, y: held.y }
         const dx = pose.x - anchor.x
         const dy = pose.y - anchor.y
         const memberSet = new Set(held.members)
