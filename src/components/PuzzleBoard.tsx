@@ -1469,10 +1469,13 @@ function PuzzleTable({
       limits.snap,
     )
     const parked = result.placements.find((piece) => piece.id === drag.id)
+    // Snap adopts the neighbor group id; clamp/move must use that id.
+    const liveGroup = parked?.group ?? drag.group
+    if (result.snapped) drag.group = liveGroup
     const held = parked
       ? clampGroup(
           result.placements,
-          drag.group,
+          liveGroup,
           drag.id,
           parked.x,
           parked.y,
@@ -1483,7 +1486,7 @@ function PuzzleTable({
         )
       : null
     const placements = held
-      ? moveGroup(result.placements, drag.group, drag.id, held.x, held.y)
+      ? moveGroup(result.placements, liveGroup, drag.id, held.x, held.y)
       : result.placements
     const anchor = placements.find((piece) => piece.id === drag.id)
     if (result.snapped && anchor) {

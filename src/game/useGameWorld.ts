@@ -390,15 +390,35 @@ export function useGameWorld(
       held.claimed = true
     }
 
-    const onMergeResult = (_result: MergeResult) => {
-      // Board truth arrives via tick / merge board snapshot; deny → next tick.
-      if (!_result.accepted) {
+    const onMergeResult = (result: MergeResult) => {
+      if (!result.accepted) {
         event('piece-logic', 'game.merge.denied_local', {
           'jigsaw.game.id': sessionId,
-          clientMergeId: Number(_result.clientMergeId),
-          rejectReason: _result.rejectReason || undefined,
+          clientMergeId: Number(result.clientMergeId),
+          rejectReason: result.rejectReason || undefined,
         })
         setYieldNonce((n) => n + 1)
+        return
+      }
+      // Prefer the merge board snapshot so a stale tick cannot un-join locally
+      // before the server's next grouped delta arrives.
+      if (result.board && builtRef.current) {
+        applyBoard(
+          boardJsonToPlacements(
+            {
+              boardRev: Number(result.board.boardRev),
+              pieces: result.board.pieces.map((p) => ({
+                pieceIndex: p.pieceIndex,
+                xQ: p.xQ,
+                yQ: p.yQ,
+                groupId: p.groupId,
+                rev: p.rev,
+              })),
+            },
+            builtRef.current.cols,
+            builtRef.current.template,
+          ),
+        )
       }
     }
 
@@ -530,32 +550,88 @@ export function useGameWorld(
         const signature = `${anchorId}|${members.join(',')}`
         let held = localDragRef.current
         const groupChanged = held !== null && held.group !== anchor.group
+        const prevMembers = held?.members ?? []
+        const prevSet = new Set(prevMembers)
+        const addedIds = held ? members.filter((id) => !prevSet.has(id)) : []
+        const merged = groupChanged || addedIds.length > 0
 
-        if (groupChanged && held) {
-          const movingGroup = pieceIndex(held.group, geo.cols, geo.rows)
-          const targetGroup = pieceIndex(anchor.group, geo.cols, geo.rows)
-          const movingMembers = held.members
-            .map((id) => pieceIndex(id, geo.cols, geo.rows))
-            .filter((v): v is number => v !== null)
-          const targetMembers = members
-            .map((id) => pieceIndex(id, geo.cols, geo.rows))
-            .filter((v): v is number => v !== null)
-          if (
-            movingGroup !== null &&
-            targetGroup !== null &&
-            movingGroup !== targetGroup
-          ) {
-            const mergeId = mergeCounter.current
-            mergeCounter.current += 1n
-            session.sendMerge({
-              movingGroupId: movingGroup,
-              targetGroupId: targetGroup,
-              movingMembers,
-              targetMembers,
-              movingAnchorXQ: Math.round(anchor.x * 32),
-              movingAnchorYQ: Math.round(anchor.y * 32),
-              clientMergeId: mergeId,
-            })
+        if (held && merged) {
+          const toIndex = (ids: readonly string[]) =>
+            ids
+              .map((id) => pieceIndex(id, geo.cols, geo.rows))
+              .filter((v): v is number => v !== null)
+
+          if (groupChanged) {
+            // Snap retags moving pieces onto the neighbor (target) group id.
+            const movingGroupId = pieceIndex(held.group, geo.cols, geo.rows)
+            const targetGroupId = pieceIndex(anchor.group, geo.cols, geo.rows)
+            const movingMembers = toIndex(prevMembers)
+            const targetMembers = toIndex(
+              members.filter((id) => !prevSet.has(id)),
+            )
+            if (
+              movingGroupId !== null &&
+              targetGroupId !== null &&
+              movingGroupId !== targetGroupId &&
+              movingMembers.length > 0 &&
+              targetMembers.length > 0
+            ) {
+              const mergeId = mergeCounter.current
+              mergeCounter.current += 1n
+              session.sendMerge({
+                movingGroupId,
+                targetGroupId,
+                movingMembers,
+                targetMembers,
+                movingAnchorXQ: Math.round(anchor.x * 32),
+                movingAnchorYQ: Math.round(anchor.y * 32),
+                clientMergeId: mergeId,
+              })
+            }
+          } else {
+            // Members grew but group id stayed put: infer former neighbor
+            // groups from the resting board (still unmerged) and merge onto held.
+            const targetGroupId = pieceIndex(held.group, geo.cols, geo.rows)
+            if (targetGroupId !== null) {
+              const resting = restingRef.current ?? []
+              const byNeighbor = new Map<string, string[]>()
+              for (const id of addedIds) {
+                const rest = resting.find((piece) => piece.id === id)
+                const neighborGroup = rest?.group ?? id
+                if (neighborGroup === held.group) continue
+                const list = byNeighbor.get(neighborGroup) ?? []
+                list.push(id)
+                byNeighbor.set(neighborGroup, list)
+              }
+              for (const [neighborGroup, movingIds] of byNeighbor) {
+                const movingGroupId = pieceIndex(
+                  neighborGroup,
+                  geo.cols,
+                  geo.rows,
+                )
+                if (movingGroupId === null || movingGroupId === targetGroupId) {
+                  continue
+                }
+                const mergeId = mergeCounter.current
+                mergeCounter.current += 1n
+                const neighborAnchor =
+                  resting.find((piece) => piece.group === neighborGroup) ??
+                  resting.find((piece) => piece.id === movingIds[0])
+                session.sendMerge({
+                  movingGroupId,
+                  targetGroupId,
+                  movingMembers: toIndex(movingIds),
+                  targetMembers: toIndex(prevMembers),
+                  movingAnchorXQ: Math.round(
+                    (neighborAnchor?.x ?? anchor.x) * 32,
+                  ),
+                  movingAnchorYQ: Math.round(
+                    (neighborAnchor?.y ?? anchor.y) * 32,
+                  ),
+                  clientMergeId: mergeId,
+                })
+              }
+            }
           }
         }
 
@@ -585,7 +661,7 @@ export function useGameWorld(
           held.signature = signature
         }
 
-        const force = groupChanged || held.sends === 0
+        const force = merged || held.sends === 0
         if (force) dragSender.reset()
         const packet = dragSender.observe(
           { x: anchor.x, y: anchor.y, t: performance.now() },

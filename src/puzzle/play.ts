@@ -512,8 +512,11 @@ export function pullToNeighbors(
   let current = placements
   let snapped = false
   let moved = false
+  // Surviving id is the neighbor's: matches MergeGroups (moving → target) so
+  // reportDrag sees groupChanged and sends the merge RPC.
+  let activeGroup = group
   for (let guard = 0; guard < current.length; guard += 1) {
-    const pending = approaches(current, group, cellW, cellH)
+    const pending = approaches(current, activeGroup, cellW, cellH)
     const best = pending.find(
       (item) => item.distance < snap && (!moved || item.distance < ALIGNED),
     )
@@ -523,26 +526,29 @@ export function pullToNeighbors(
         placements: current,
         near:
           closest && closest.distance < highlight
-            ? { group, neighborGroup: closest.neighborGroup }
+            ? { group: activeGroup, neighborGroup: closest.neighborGroup }
             : null,
         snapped,
       }
     }
     if (!moved) {
       current = current.map((piece) =>
-        piece.group === group
+        piece.group === activeGroup
           ? { ...piece, x: piece.x + best.dx, y: piece.y + best.dy }
           : piece,
       )
       moved = true
     }
+    const movingGroup = activeGroup
+    const targetGroup = best.neighborGroup
     current = current.map((piece) =>
-      piece.group === best.neighborGroup ? { ...piece, group } : piece,
+      piece.group === movingGroup ? { ...piece, group: targetGroup } : piece,
     )
+    activeGroup = targetGroup
     snapped = true
     event('piece-logic', 'puzzle.group_merge', {
-      group,
-      neighborGroup: best.neighborGroup,
+      group: targetGroup,
+      neighborGroup: movingGroup,
     })
   }
   return { placements: current, near: null, snapped }

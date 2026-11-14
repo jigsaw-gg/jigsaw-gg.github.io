@@ -329,6 +329,8 @@ message MoveHeld {
 
 // Join one held group (or free group) onto another. Server validates geometry
 // / ownership and either applies or rejects.
+// Client snap adopts target_group_id as the surviving local group id for every
+// member of both sides (moving pieces are retagged; target id is unchanged).
 message MergeGroups {
   uint32 moving_group_id = 1;
   uint32 target_group_id = 2;
