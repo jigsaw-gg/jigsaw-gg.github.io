@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
+import { createGame, GameHttpError } from '../game/gameClient.ts'
 import { useI18n } from '../i18n/useI18n.ts'
 import { event } from '../otel/index.ts'
 import {
   normalizePlayerName,
+  readPlayerId,
   readPlayerName,
   rememberConfirmedPlayerName,
   writePlayerName,
@@ -39,6 +41,8 @@ export function PuzzlesPage() {
   const [imageFailed, setImageFailed] = useState(false)
   const [loadedPreviewUrl, setLoadedPreviewUrl] = useState<string | null>(null)
   const [galleryOpen, setGalleryOpen] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
   const galleryButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -66,7 +70,7 @@ export function PuzzlesPage() {
   const count = Number(pieceCount)
   const countOk = Number.isInteger(count) && count >= 1 && count <= 200
   const name = normalizePlayerName(playerName)
-  const canStart = imageSize !== null && countOk && name !== null
+  const canStart = imageSize !== null && countOk && name !== null && !starting
   const showPreview =
     loadedPreviewUrl === imageUrl.trim() && loadedPreviewUrl !== ''
   const grid =
@@ -75,8 +79,8 @@ export function PuzzlesPage() {
       : null
   const actualPieces = grid ? grid.cols * grid.rows : null
 
-  function start() {
-    if (!imageSize || !countOk || !name) return
+  async function start() {
+    if (!imageSize || !countOk || !name || starting) return
     writePlayerName(name)
     rememberConfirmedPlayerName(name)
     const sessionId = createSessionId()
@@ -87,20 +91,48 @@ export function PuzzlesPage() {
       pieceCount: count,
       seed,
     }
-    event('bootstrap', 'puzzle.create', {
-      sessionId,
-      pieceCount: count,
-      seed,
-    })
-    writeSession(sessionId, setup)
-    navigate(playInvitePath(sessionId))
+    setStarting(true)
+    setStartError(null)
+    try {
+      await createGame({
+        gameId: sessionId,
+        creatorPlayerId: readPlayerId(),
+        creatorDisplayName: name,
+        setup,
+      })
+      event('bootstrap', 'puzzle.create', {
+        'jigsaw.game.id': sessionId,
+        sessionId,
+        pieceCount: count,
+        seed,
+      })
+      writeSession(sessionId, setup)
+      navigate(playInvitePath(sessionId))
+    } catch (err) {
+      const message =
+        err instanceof GameHttpError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : text.createFailed
+      event('bootstrap', 'puzzle.create_failed', {
+        'jigsaw.game.id': sessionId,
+        message,
+        status: err instanceof GameHttpError ? err.status : undefined,
+        code: err instanceof GameHttpError ? err.code : undefined,
+      })
+      setStartError(message)
+      setStarting(false)
+    }
   }
 
   useTelegramMainButton({
     text: text.start,
     visible: true,
     enabled: canStart,
-    onClick: start,
+    onClick: () => {
+      void start()
+    },
   })
 
   function pickGalleryImage(url: string) {
@@ -119,7 +151,7 @@ export function PuzzlesPage() {
             className="setup"
             onSubmit={(event) => {
               event.preventDefault()
-              start()
+              void start()
             }}
           >
             <PlayerNameField
@@ -213,8 +245,13 @@ export function PuzzlesPage() {
                 {text.imageError}
               </p>
             )}
+            {startError && (
+              <p className="banner banner--error" role="alert">
+                {startError}
+              </p>
+            )}
             <button type="submit" className="button" disabled={!canStart}>
-              {text.start}
+              {starting ? text.starting : text.start}
             </button>
           </form>
         </div>

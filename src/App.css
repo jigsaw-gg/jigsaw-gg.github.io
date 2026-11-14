@@ -411,6 +411,28 @@
   line-height: 1.5;
 }
 
+.about-options {
+  margin: 1.5rem 0;
+}
+
+.about-options__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.about-options__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.about-options__option input:disabled {
+  cursor: not-allowed;
+}
+
 .about-relay {
   margin: 1.5rem 0;
 }
@@ -437,18 +459,7 @@
 }
 
 .about-telegram {
-  margin-top: 1.5rem;
-}
-
-.about-telegram h2 {
-  margin: 0 0 0.75rem;
-  font-size: 1.05rem;
-}
-
-.about-telegram__subheading {
-  margin: 1.25rem 0 0.75rem;
-  font-size: 0.95rem;
-  font-weight: 600;
+  margin: 1.5rem 0;
 }
 
 .about-telegram__url-params {
@@ -462,13 +473,13 @@
   font-weight: 500;
 }
 
-.about-version {
-  margin: 0 0 1rem;
-  font-size: 1rem;
+.about-commit-section {
+  margin: 1.5rem 0;
 }
 
-.about-version__label {
-  color: var(--muted);
+.about-version {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
 }
 
 .about-version__commit {
@@ -1602,15 +1613,25 @@ textarea.gamepad-focused,
   display: grid;
   gap: 0.15rem;
   max-width: min(22rem, calc(100vw - 1rem));
+  margin: 0;
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: 0.35rem;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   color: var(--muted);
+  font: inherit;
   font-size: 0.65rem;
   line-height: 1.25;
-  pointer-events: none;
+  text-align: start;
+  cursor: pointer;
   backdrop-filter: blur(6px);
+}
+
+.otel-debug:hover,
+.otel-debug:focus-visible {
+  border-color: var(--accent);
+  color: var(--text);
+  outline: none;
 }
 
 .otel-debug__row {
@@ -1633,4 +1654,104 @@ textarea.gamepad-focused,
   color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.otel-debug-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  margin: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+}
+
+.otel-debug-dialog::backdrop {
+  background: rgb(8 10 14 / 0.55);
+}
+
+.otel-debug-dialog__panel {
+  padding: 1.25rem 1.25rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.22);
+}
+
+.otel-debug-dialog__panel h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.otel-debug-dialog__lede {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.otel-debug-dialog__rows {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.otel-debug-dialog__row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.otel-debug-dialog__key {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.otel-debug-dialog__input {
+  min-width: 0;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.otel-debug-dialog__input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.otel-debug-dialog__copy {
+  white-space: nowrap;
+}
+
+.otel-debug-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 32rem) {
+  .otel-debug-dialog__row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'key copy'
+      'input input';
+  }
+
+  .otel-debug-dialog__key {
+    grid-area: key;
+  }
+
+  .otel-debug-dialog__input {
+    grid-area: input;
+  }
+
+  .otel-debug-dialog__copy {
+    grid-area: copy;
+  }
 }

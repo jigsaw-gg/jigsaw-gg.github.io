@@ -1,112 +1,131 @@
-import {
-  APINATOR_APP_KEY,
-  APINATOR_CHANNEL,
-  APINATOR_CLUSTER,
-  APINATOR_EVENT,
-  APINATOR_MOCK,
-  type ApinatorSnapshot,
-} from '../apinator.ts'
-import { connectionLabel, connectionTone } from '../connectionStatus.ts'
-import { localizeError } from '../i18n/errors.ts'
-import type { Messages } from '../i18n/types.ts'
 import { useI18n } from '../i18n/useI18n.ts'
+import { useGameRelay } from '../relay/useGameRelay.ts'
+import type { RelayStatus } from '../relay/types.ts'
 
-function formatData(data: unknown): string {
-  if (typeof data === 'string') return data
-  try {
-    return JSON.stringify(data, null, 2)
-  } catch {
-    return String(data)
+function relayStatusLabel(
+  status: RelayStatus,
+  messages: ReturnType<typeof useI18n>['messages']['about'],
+): string {
+  switch (status) {
+    case 'connecting':
+      return messages.relayStatusConnecting
+    case 'connected':
+      return messages.relayStatusConnected
+    case 'disconnected':
+      return messages.relayStatusDisconnected
+    case 'failed':
+      return messages.relayStatusFailed
   }
 }
 
-function formatTime(iso: string, locale: string): string {
+function relayTone(status: RelayStatus): 'ok' | 'wait' | 'bad' {
+  if (status === 'connected') return 'ok'
+  if (status === 'connecting') return 'wait'
+  return 'bad'
+}
+
+function formatLogTime(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
   return date.toLocaleTimeString(locale)
 }
 
-function subscriptionLabel(
-  status: ApinatorSnapshot,
-  text: Messages['network'],
-): string {
-  if (status.subscription === 'error') return text.failed
-  if (status.subscription === 'subscribed' && status.state === 'connected') {
-    return text.subscribed
-  }
-  if (status.state === 'connected') return text.subscribing
-  return text.waiting
-}
-
-export function NetworkStatusPage({ status }: { status: ApinatorSnapshot }) {
+export function NetworkStatusPage() {
   const { locale, messages } = useI18n()
   const text = messages.network
-  const tone = connectionTone(status.state)
+  const about = messages.about
+  const relay = useGameRelay()
+  const tone = relayTone(relay.status)
+
   return (
     <main className="page">
       <h1>{text.title}</h1>
       <p className="lede">{text.lede}</p>
 
-      <section className="status-card" aria-live="polite">
+      <section className="status-card about-relay" aria-live="polite">
         <div className="status-card__header">
-          <h2>Apinator</h2>
+          <h2>{about.relayTitle}</h2>
           <span className={`badge badge--${tone}`}>
-            {connectionLabel(status.state, messages.connection)}
+            {relayStatusLabel(relay.status, about)}
           </span>
         </div>
         <dl className="facts">
           <div>
-            <dt>{text.cluster}</dt>
-            <dd>{APINATOR_CLUSTER}</dd>
-          </div>
-          <div>
-            <dt>{text.channel}</dt>
+            <dt>{about.relayTransport}</dt>
             <dd>
-              <code>{APINATOR_CHANNEL}</code>
+              {relay.transportType
+                ? relay.transportType === 'webtransport'
+                  ? 'WebTransport'
+                  : 'WebSocket'
+                : about.relayTransportNone}
             </dd>
           </div>
           <div>
-            <dt>{text.event}</dt>
+            <dt>{about.relayStatus}</dt>
+            <dd>{relayStatusLabel(relay.status, about)}</dd>
+          </div>
+          <div>
+            <dt>{about.relayLatency}</dt>
             <dd>
-              <code>{APINATOR_EVENT}</code>
+              {relay.latencyMs === null
+                ? about.relayLatencyNone
+                : `${relay.latencyMs} ms`}
             </dd>
           </div>
           <div>
-            <dt>{text.subscription}</dt>
-            <dd>{subscriptionLabel(status, text)}</dd>
-          </div>
-          <div>
-            <dt>{text.socket}</dt>
-            <dd>{status.socketId ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>{text.appKey}</dt>
+            <dt>{about.relayWebTransportUrl}</dt>
             <dd>
-              <code>
-                {APINATOR_APP_KEY ||
-                  (APINATOR_MOCK ? text.mock : text.notConfigured)}
-              </code>
+              <code>{relay.webtransportUrl}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>{about.relayWebSocketUrl}</dt>
+            <dd>
+              <code>{relay.websocketUrl}</code>
             </dd>
           </div>
         </dl>
 
-        {status.error && (
+        {relay.error ? (
           <div className="banner banner--error" role="alert">
-            <p>{localizeError(status.error, messages.errors)}</p>
+            <p>{relay.error}</p>
           </div>
-        )}
+        ) : null}
 
-        <h3 className="status-card__subtitle">{text.recent}</h3>
-        {status.events.length === 0 ? (
-          <p className="muted">{text.empty}</p>
+        <div className="about-relay__actions">
+          <button
+            type="button"
+            className="button"
+            onClick={relay.sendPing}
+            disabled={relay.status !== 'connected'}
+          >
+            {about.relaySendPing}
+          </button>
+          <button type="button" className="button" onClick={relay.reconnect}>
+            {about.relayReconnect}
+          </button>
+          <label className="about-relay__auto">
+            <input
+              type="checkbox"
+              checked={relay.autoPing}
+              onChange={(event) => relay.setAutoPing(event.target.checked)}
+              disabled={relay.status !== 'connected'}
+            />
+            {about.relayAutoPing}
+          </label>
+        </div>
+
+        <h3 className="status-card__subtitle">{about.relayLog}</h3>
+        {relay.messages.length === 0 ? (
+          <p className="muted">{about.relayLogEmpty}</p>
         ) : (
-          <ul className="event-list">
-            {status.events.map((event) => (
-              <li key={event.id}>
+          <ul className="event-list about-relay__log">
+            {relay.messages.map((entry) => (
+              <li key={entry.id}>
                 <p className="event-list__time">
-                  {formatTime(event.at, locale)}
+                  {formatLogTime(entry.at, locale)} · {entry.direction}
                 </p>
-                <pre className="payload">{formatData(event.data)}</pre>
+                <pre className="payload">{entry.text}</pre>
               </li>
             ))}
           </ul>

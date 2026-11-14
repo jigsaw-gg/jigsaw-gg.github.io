@@ -67,7 +67,7 @@ import {
   type StickDisc,
   type ThumbSide,
 } from '../puzzle/twoThumb.ts'
-import type { RemoteCursor } from '../puzzle/useWorldSync.ts'
+import type { RemoteCursor } from '../game/useGameWorld.ts'
 import { hapticImpact, hapticNotification } from '../telegram/webApp.ts'
 
 /** Nearby-piece glow fade, in milliseconds. */

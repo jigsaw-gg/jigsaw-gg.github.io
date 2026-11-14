@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
 import { PuzzleBoard } from '../components/PuzzleBoard.tsx'
@@ -17,9 +17,9 @@ import {
 } from '../playerName.ts'
 import { fullscreenElement, isImmersive, setImmersive } from '../fullscreen.ts'
 import { chooseGrid } from '../puzzle/cut.ts'
+import { useGameSession } from '../game/useGameSession.ts'
+import { useGameWorld } from '../game/useGameWorld.ts'
 import { normalizeSessionId, playInvitePath } from '../puzzle/session.ts'
-import { usePuzzleSession } from '../puzzle/usePuzzleSession.ts'
-import { useWorldSync } from '../puzzle/useWorldSync.ts'
 import { playTelegramInviteUrl } from '../telegram/config.ts'
 import { useTelegramBackHandler } from '../telegram/useTelegramBackHandler.ts'
 import { useTelegramMainButton } from '../telegram/useTelegramMainButton.ts'
@@ -170,13 +170,40 @@ function PlaySession({
     setPuzzleSessionId(sessionId)
     return () => setPuzzleSessionId(null)
   }, [sessionId])
-  const { setup, phase, channelError, channelName, source, players } =
-    usePuzzleSession(sessionId, { id: playerId, name: playerName })
-  const world = useWorldSync(
+  const session = useGameSession(sessionId, {
+    id: playerId,
+    name: playerName,
+  })
+  const {
+    setup,
+    phase,
+    channelError,
+    channelName,
+    source,
+    players,
+    cols,
+    rows,
+    board,
+    play,
+    joinGeneration,
+    applyPresence,
+  } = session
+  const peerNames = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of players) map.set(p.id, p.name)
+    return map
+  }, [players])
+  const world = useGameWorld(
     sessionId,
     { id: playerId, name: playerName },
     setup,
-    players,
+    cols,
+    rows,
+    board,
+    play,
+    joinGeneration,
+    applyPresence,
+    peerNames,
   )
   const inviteUrl = `${window.location.origin}${playInvitePath(sessionId)}`
   const telegramInviteUrl = playTelegramInviteUrl(sessionId)
@@ -283,9 +310,9 @@ function PlaySession({
       <main className="page page--wide" hidden={playing}>
         <h1>{text.sessionTitle}</h1>
         <p className="lede">
-          {source === 'peer'
-            ? text.sourcePeer
-            : source === 'local'
+          {source === 'server'
+            ? text.sourceServer
+            : source === 'cache'
               ? text.sourceLocal
               : text.sourceWaiting}
         </p>
@@ -354,9 +381,11 @@ function PlaySession({
             <dd>
               {phase === 'live'
                 ? text.joined
-                : phase === 'error'
-                  ? text.failed
-                  : text.joining}
+                : phase === 'expired'
+                  ? text.expired
+                  : phase === 'error'
+                    ? text.failed
+                    : text.joining}
             </dd>
           </div>
           {setup && (
@@ -386,9 +415,14 @@ function PlaySession({
             {localizeError(channelError, messages.errors)}
           </p>
         )}
-        {!setup && phase !== 'error' && (
+        {!setup && phase !== 'error' && phase !== 'expired' && (
           <p className="muted" role="status">
             {text.asking}
+          </p>
+        )}
+        {phase === 'expired' && (
+          <p className="banner banner--error" role="alert">
+            {text.expiredLede}
           </p>
         )}
       </main>

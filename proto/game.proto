@@ -18,6 +18,12 @@ option java_multiple_files = true;
 // WebTransport the two streams carry the same messages partitioned by
 // StreamFrame.stream (see StreamKind). Fallbacks (WebSocket bidi, or a single
 // Connect/gRPC Play RPC over TCP) multiplex both kinds on one bidi pipe.
+//
+// Host ownership: the **client** configures scheme/host/port for play
+// WebTransport and WebSocket (env / build). JoinGame's PlayEndpoints carry
+// **path + query only** (see PlayEndpoints). The server may change the path
+// (e.g. `/game` → `/use-this-new-path?…`) but MUST NOT redirect the client to
+// another hostname or port.
 // =============================================================================
 
 // ---------------------------------------------------------------------------
@@ -140,17 +146,32 @@ message JoinGameResponse {
   // Full board snapshot so late joiners do not wait for ticks.
   BoardSnapshot board = 8;
   repeated PlayerInfo players = 9;
-  // Where to open the UDP (WebTransport) play streams; WS is fallback only.
+  // Relative play paths (see PlayEndpoints). Client resolves against its
+  // configured WebTransport / WebSocket bases.
   PlayEndpoints play = 10;
   TransportKind negotiated_transport = 11;
 }
 
-// Best case is always WebTransport (QUIC/UDP) when the client can dial it.
+// Play dial targets after JoinGame.
+//
+// Contract:
+//   - Client knows absolute bases (scheme + host + port), e.g. from
+//     VITE_GAME_WEBTRANSPORT_URL / VITE_GAME_WEBSOCKET_URL.
+//   - Server returns path-absolute relative references only: must start with
+//     `/`, may include `?query`. Example: `/game?game_id=…&player_id=…`.
+//   - Server MAY change the path across versions or redirects
+//     (`/game` → `/use-this-new-path`), still on the client's configured host.
+//   - Server MUST NOT return another hostname or port. Absolute URLs with a
+//     host are a protocol error; compliant clients ignore host/port and keep
+//     only `path + query` when migrating old servers.
+//
+// Best case is always WebTransport (QUIC/UDP) when the client can dial it;
+// WebSocket is the fallback pipe on the client's WS base.
 message PlayEndpoints {
-  // e.g. https://host:31100/game?game_id=…&player_id=…
-  string webtransport_url = 1;
-  // Fallback bidi pipe, e.g. ws://host:21100/game?game_id=…&player_id=…
-  string websocket_url = 2;
+  // Path + query for WebTransport, e.g. /game?game_id=…&player_id=…
+  string webtransport_path = 1;
+  // Path + query for WebSocket fallback, e.g. /game?game_id=…&player_id=…
+  string websocket_path = 2;
 }
 
 message LeaveGameRequest {
@@ -210,7 +231,22 @@ message HeldGroup {
 
 // ===== Motion (client compression + server repair share this shape) =========
 
-// Mirrors src/puzzle/kinematics.ts MotionPacket after encodeMotion.
+// Shared knot for CursorUpdate / MoveHeld (client→server) and Tick poses
+// (server→client). Same units as src/puzzle/kinematics.ts MotionPacket:
+// x_q/y_q/v*/a* are MOTION_Q quanta (px * 32), never raw pixels.
+//
+// absolute:
+//   true  → x_q/y_q are world-table coordinates.
+//   false → x_q/y_q are deltas from the sender's previous knot for this
+//           trajectory (cursor or held). The receiver MUST add them to its
+//           last resolved pose. A relative sample with no prior basis is
+//           ignored (same as the browser MotionTrack).
+// anchor=true implies a required exact pose (and is treated as absolute).
+// hide=true clears / conceals that trajectory; it is NOT a world pose at 0,0.
+//
+// Client→server may mix absolute and relative knots (bandwidth). Server
+// trajectory repair must honor `absolute`. Server→client Tick cursor/held
+// samples are always absolute=true after repair.
 message MotionSample {
   bool hide = 1;
   bool anchor = 2;
@@ -344,8 +380,12 @@ message Tick {
   uint64 tick_id = 1;
   uint64 board_rev = 2;
   repeated PlayerPose players = 3;
-  // Only pieces that changed since last tick (or full set when resync=true).
+  // Resting board only. Held pieces are omitted from non-resync deltas (and
+  // still appear at last committed board pose on resync); live drag pose is
+  // PlayerPose.held + holdings, not piece_deltas.
   repeated PieceState piece_deltas = 4;
+  // Authoritative who-holds-what. Membership can be sparse on PlayerPose;
+  // clients retain the last member list while the player remains in holdings.
   repeated HeldGroup holdings = 5;
   bool resync = 6;
 }
@@ -354,7 +394,11 @@ message PlayerPose {
   string player_id = 1;
   // Server-smoothed cursor (after glitch repair). hide ⇒ not rendered.
   MotionSample cursor = 2;
-  // Server-smoothed held-group anchor pose when holding.
+  // Server-smoothed held-group anchor. Always absolute when present as a pose.
+  // hide=true means "no motion sample yet / not drawing held motion" — it does
+  // NOT clear the hold. While the player appears in Tick.holdings, clients keep
+  // the previous held pose (or leave pieces on the resting board until the
+  // first non-hide sample). held_* index fields may still be populated.
   MotionSample held = 3;
   uint32 held_anchor_piece_index = 4;
   uint32 held_group_id = 5;

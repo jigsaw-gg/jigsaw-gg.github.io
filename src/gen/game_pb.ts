@@ -372,24 +372,26 @@ export const JoinGameResponseSchema: GenMessage<JoinGameResponse> =
   messageDesc(file_game, 7)
 
 /**
- * Best case is always WebTransport (QUIC/UDP) when the client can dial it.
+ * Play dial targets after JoinGame.
+ *
+ * Client owns scheme/host/port; these fields are path + query only.
  *
  * @generated from message game.v1.PlayEndpoints
  */
 export type PlayEndpoints = Message<'game.v1.PlayEndpoints'> & {
   /**
-   * e.g. https://host:31100/game?game_id=…&player_id=…
+   * Path + query for WebTransport, e.g. /game?game_id=…&player_id=…
    *
-   * @generated from field: string webtransport_url = 1;
+   * @generated from field: string webtransport_path = 1;
    */
-  webtransportUrl: string
+  webtransportPath: string
 
   /**
-   * Fallback bidi pipe, e.g. ws://host:21100/game?game_id=…&player_id=…
+   * Path + query for WebSocket fallback, e.g. /game?game_id=…&player_id=…
    *
-   * @generated from field: string websocket_url = 2;
+   * @generated from field: string websocket_path = 2;
    */
-  websocketUrl: string
+  websocketPath: string
 }
 
 /**

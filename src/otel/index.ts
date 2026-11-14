@@ -1,9 +1,13 @@
-export { SESSION_ID_ATTR, TAB_ID_ATTR } from './attrs.ts'
+export { SESSION_ID_ATTR, TAB_ID_ATTR, TRANSPORT_ATTR } from './attrs.ts'
 export type { OtelCategory } from './categories.ts'
 export { OTEL_CATEGORIES } from './categories.ts'
+export type { PlayTransportLabel } from './context.ts'
 export {
+  getPlayTransport,
   getPuzzleSessionId,
+  setPlayTransport,
   setPuzzleSessionId,
+  subscribePlayTransport,
   subscribePuzzleSessionId,
   TAB_ID,
 } from './context.ts'

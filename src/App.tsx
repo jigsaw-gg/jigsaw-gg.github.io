@@ -15,7 +15,6 @@ import { PlayPage } from './pages/PlayPage.tsx'
 import { PuzzlesPage } from './pages/PuzzlesPage.tsx'
 import { normalizeSessionId, playInvitePath } from './puzzle/session.ts'
 import { TelegramUi } from './telegram/TelegramUi.tsx'
-import { useApinatorStatus } from './useApinatorStatus.ts'
 import './relay/gameRelay.ts'
 import './App.css'
 
@@ -33,20 +32,15 @@ function LegacyPlayRedirect() {
 }
 
 export default function App() {
-  const status = useApinatorStatus()
-
   return (
     <BrowserRouter>
       <TelegramUi>
         <div className="app">
-          <SiteHeader state={status.state} />
+          <SiteHeader />
           <div className="app__main">
             <Routes>
               <Route path="/" element={<PuzzlesPage />} />
-              <Route
-                path="/network"
-                element={<NetworkStatusPage status={status} />}
-              />
+              <Route path="/network" element={<NetworkStatusPage />} />
               <Route path="/puzzles" element={<Navigate to="/" replace />} />
               <Route path="/play" element={<PlayInviteRoute />} />
               <Route path="/play/:sessionId" element={<LegacyPlayRedirect />} />

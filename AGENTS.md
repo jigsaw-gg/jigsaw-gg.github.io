@@ -1,6 +1,6 @@
 # jigsaw-gg
 
-Vite + React + TypeScript jigsaw, deployed as a static site to GitHub Pages at the domain root. There is no application server. A puzzle session is setup cached in `localStorage` plus a private Apinator channel that peers use to share it.
+Vite + React + TypeScript jigsaw, deployed as a static site to GitHub Pages at the domain root. There is no application server in this repo. Multiplayer goes through **jigsaw-gg-server**: HTTP lobby (`CreateGame` / `JoinGame`) plus WebTransport or WebSocket `/game` play streams (`game.v1` `StreamFrame`s).
 
 ## Commands
 
@@ -45,8 +45,8 @@ every category. Call sites always use `withSpan` / `event` / `startSpan` from
 `src/otel/` — they never branch on whether OTEL is on; the helpers no-op when
 the endpoint is missing or the category is filtered.
 
-Every span carries `jigsaw.tab.id` (new NanoID per document load). While a
-play session is mounted, spans also carry `jigsaw.session.id`. A small
+Every span carries `jigsaw.tab.id` (new ULID-like id per document load). While
+a play session is mounted, spans also carry `jigsaw.session.id`. A small
 bottom-left overlay shows those ids in local/dev when OTEL is configured; it
 is omitted from production / GitHub Pages builds.
 
@@ -54,23 +54,112 @@ Production / GitHub Pages builds force all OTEL env values empty and skip
 loading the SDK chunk (`import.meta.env.PROD`), so credentials never ship in
 the published bundle. OpenObserve must allow browser CORS for local ingest.
 
-## Apinator
+## Telemetry (OpenObserve)
 
-The app key is public. Vite inlines it from `VITE_APINATOR_APP_KEY` or `APINATOR_APP_KEY` (local `.env`, or the `APINATOR_APP_KEY` repository variable in `.github/workflows/pages.yml`). Keep the key out of source files. The Pages build reads that variable only and fails when it is missing.
+Local client and `jigsaw-gg-server` both export into the same traces stream
+(`default`, org `default`). Use the `user-openobserve` MCP (`SearchSQL` with
+`type: "traces"`). Attribute dots flatten to underscores in SQL columns.
+`start_time` / `end_time` are **microseconds**; prefer the last 1–2 hours (or
+`StreamSchema` → `doc_time_min` / `doc_time_max` when unsure).
 
-`APINATOR_APP_SECRET` is inlined the same way, from `VITE_APINATOR_APP_SECRET` or `APINATOR_APP_SECRET` (local `.env`, or the `APINATOR_APP_SECRET` repository variable). The Pages build fails when it is missing. Keep it out of source files. It is present in the built JavaScript: each private-channel subscription is signed in the browser with the live socket id. That signature is the handshake Apinator requires before it relays client events. It is not an access boundary.
+**Ids (from the bottom-left OTEL overlay or a bug report):**
 
-The browser answers `POST /api/realtime/auth` locally and does not send it to GitHub Pages. The Vite dev and preview servers still sign that route when the client bundle has no secret.
+| Overlay / URL         | Client column                                             | Server column                   |
+| --------------------- | --------------------------------------------------------- | ------------------------------- |
+| Session / play `?id=` | `jigsaw_session_id` (also `jigsaw_game_id` on some spans) | `game_id` — same string         |
+| Tab                   | `jigsaw_tab_id`                                           | _(none — server has no tab id)_ |
+| Player (NanoID)       | `jigsaw_player_id`                                        | `player_id`                     |
 
-A worktree has no `.env`. With no app key, `vite` uses the in-browser mock in `src/apinatorMock.ts`: the connection is local, events reach other tabs on this machine, and nothing is sent to Apinator. Leave the worktree on that mock.
+`service_name`: browser = `jigsaw-gg`, server = `jigsaw-gg-server`.
 
-Client events go on private channels, use a `client-*` name, and are not echoed back to the sender. The channel name is what separates sessions. Do not add an invite salt or extra traffic signing.
+**1. Client spans for a session (all tabs):**
+
+```sql
+SELECT _timestamp, operation_name, jigsaw_tab_id, jigsaw_transport,
+       jigsaw_player_id, pieceid, granted, denied
+FROM "default"
+WHERE jigsaw_session_id = '<SESSION_ID>'
+ORDER BY _timestamp ASC
+```
+
+**2. One tab only:** add `AND jigsaw_tab_id = '<TAB_ID>'`. Useful operations:
+`piece.drag_start` / `piece.drag_end`, `game.claim.send` / `game.claim.result`,
+`game.play.connect`, `game.play.welcome`, `game.presence`.
+
+Cursor path (category `input`, ~20 Hz max): mover tab emits `cursor.local`
+(`x`/`y` human pointer). Observer tab emits `cursor.remote` (`x`/`y` after
+presentation smoother, `targetX`/`targetY` last tick sample, `remotePlayerId`).
+Compare the same wall-clock window across both `jigsaw_tab_id`s to see lag.
+
+**3. Map tab → player_id** (needed for server queries):
+
+```sql
+SELECT jigsaw_tab_id, jigsaw_player_id, operation_name
+FROM "default"
+WHERE jigsaw_session_id = '<SESSION_ID>'
+  AND jigsaw_player_id IS NOT NULL
+  AND jigsaw_player_id != ''
+```
+
+Prefer rows like `game.session.live`, `game.world.ready`, or `game.join`.
+
+**4. Related server spans** (same game; optional player filter):
+
+```sql
+SELECT _timestamp, operation_name, game_id, player_id
+FROM "default"
+WHERE service_name = 'jigsaw-gg-server'
+  AND game_id = '<SESSION_ID>'
+ORDER BY _timestamp ASC
+```
+
+Narrow with `AND player_id = '<PLAYER_ID>'` from step 3. Typical names:
+`claim`, `release`, `move_held`, `client_envelope`, `rpc.game_session`,
+`rpc.unary`.
+
+**5. Side-by-side window:** take mover `piece.drag_start`…`piece.drag_end`
+`_timestamp`s from the client query, then re-run the server query with
+`_timestamp` between those bounds (and a little slack). Compare claim/move_held
+on the server with what the observer tab did or did not emit.
+
+`GetLatestTraces` can list recent traces, but for session/tab filters prefer
+`SearchSQL` as above.
+
+## Protocol contract (client ↔ server)
+
+`proto/game.proto` is the source of truth for play-stream semantics (copied
+from `jigsaw-gg-server` via `./scripts/gen-proto.sh`). When the server does
+something the client did not expect — or the reverse — **document the intended
+behavior in that proto** (message/field comments), then align the
+implementation to the comment. Prefer fixing the side that violates the
+contract; the server is easy to change. Do not paper over ambiguity with a
+client-only workaround that leaves the wire meaning unclear.
+
+Motion (`MotionSample`) is the usual hotspot: `absolute` / relative quanta,
+`hide` vs clearing a hold, and Tick `holdings` vs `PlayerPose.held`. Read those
+comments before changing drag/cursor sync. Until the server trajectory honors
+`absolute=false` deltas, client cursor uplink keeps `absoluteEveryMs: 0` (all
+absolute knots) so remotes do not teleport near the origin between absolute
+samples.
+
+## Game server
+
+Lobby unaries (JSON or protobuf) on the HTTP port, e.g. `POST /v1/game/create`, `/v1/game/join`, `GET /v1/game/{id}`. Play: client owns WT/WS **bases** (scheme/host/port); `JoinGame` returns **path+query only** (`PlayEndpoints.webtransport_path` / `websocket_path`, e.g. `/game?…`). Client resolves those against its bases, then opens length-prefixed `StreamFrame`s on WT (two bidi streams) or WS (multiplexed). Server may change the path; it must not send another hostname/port.
+
+Client config (local `.env` or Pages variables):
+
+- `VITE_GAME_HTTP_URL` — lobby base (`http://127.0.0.1:21100` locally)
+- `VITE_GAME_WEBTRANSPORT_URL` / `VITE_GAME_WEBSOCKET_URL` — play + relay origins (scheme/host/port). Relay probe appends `/relay` and `/ws`.
+
+Proto sources live in `jigsaw-gg-server`; `./scripts/gen-proto.sh` copies them and regenerates `src/gen/*_pb.ts`. Keep `proto/game.proto` in sync with the server.
+
+A worktree may copy `.env` from the main checkout via `scripts/setup-worktree.sh`. Point that env at a running local `jigsaw-gg-server`.
 
 ## Puzzle sessions
 
-The web invite path is `/play/?id=<id>` (a real `play/index.html` on Pages so Telegram and other crawlers get HTTP 200 and can read OG tags). Legacy `/play/<id>` redirects there. New ids are 21-character NanoIDs; older UUIDs still resolve. The channel name is `private-puzzle-<id>`. One channel per session, so a client only sends and receives that session's events. The `private-` prefix is what lets Apinator relay those client events. Knowing the channel name is enough to join.
+The web invite path is `/play/?id=<id>` (a real `play/index.html` on Pages so Telegram and other crawlers get HTTP 200 and can read OG tags). Legacy `/play/<id>` redirects there. New ids are 26-character ULID-like Crockford strings (letter-first, fully random — no timestamp ordering); older 21-character NanoIDs and UUIDs still resolve. The host calls `CreateGame` with that id before navigating; every client (including the host) `JoinGame`s and opens play streams.
 
-Setup (image URL, pixel size, piece count, seed) is stored under `jigsaw-session:<id>` and shared with `client-session-request` and `client-session-offer`.
+Setup is also cached under `jigsaw-session:<id>` (and world under `jigsaw-world:…`) with a **24h inactivity** TTL. Server memory TTL matches. Cache is not a substitute for Create/Join.
 
 Outer piece edges stay on the image rectangle. Inner edges are the seeded cuts. Load the puzzle image with a plain `Image()` and leave `crossOrigin` unset, or some hosts refuse the request and the picture never appears.
 
@@ -82,7 +171,7 @@ The site root `https://jigsaw-gg.github.io/` is the Mini App URL in BotFather. B
 https://t.me/Jigsaw_GG_Bot/tg_miniapp?startapp=<session-id>
 ```
 
-Telegram opens the Mini App and injects `start_param` (also available as `tgWebAppStartParam`). The React app reads that, normalizes it, and routes to `/play/?id=…`. No bot backend (webhooks / long polling) is required for launch or invite routing; Apinator still carries game traffic.
+Telegram opens the Mini App and injects `start_param` (also available as `tgWebAppStartParam`). The React app reads that, normalizes it, and routes to `/play/?id=…`. No bot backend (webhooks / long polling) is required for launch or invite routing; the game server carries play traffic.
 
 Identity is hardcoded as a fallback, overridable locally via `config.json` (`telegram_bot_username`, `telegram_mini_app_short_name`, `telegram_mini_app_title`) and flagged to move to `.env` / CI (`VITE_TELEGRAM_BOT_USERNAME`, `VITE_TELEGRAM_MINI_APP_SHORT_NAME`, `VITE_TELEGRAM_MINI_APP_TITLE`).
 

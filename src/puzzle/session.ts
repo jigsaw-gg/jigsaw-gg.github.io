@@ -1,4 +1,4 @@
-import { nanoid } from 'nanoid'
+import { createUlidLikeId, ULID_LIKE } from '../id.ts'
 import {
   isPuzzleStorageExpired,
   readTouchedAt,
@@ -15,9 +15,8 @@ export const DEFAULT_IMAGE_URL = GALLERY_IMAGE_URLS[1]
 
 export const DEFAULT_PIECE_COUNT = 30
 
-/** URL-safe NanoID. Same collision odds as a UUID, with no encoding in the path. */
-const SESSION_ID_LENGTH = 21
-const NANO_ID = new RegExp(`^[A-Za-z0-9_-]{${SESSION_ID_LENGTH}}$`)
+/** Legacy 21-char NanoIDs still resolve in invite links. */
+const NANO_ID = /^[A-Za-z0-9_-]{21}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export interface PuzzleSetup {
@@ -29,7 +28,7 @@ export interface PuzzleSetup {
 }
 
 export function createSessionId(): string {
-  return nanoid(SESSION_ID_LENGTH)
+  return createUlidLikeId()
 }
 
 /** Shareable path. /play/ is a real file on Pages, so this URL returns 200. */
@@ -39,6 +38,7 @@ export function playInvitePath(sessionId: string): string {
 
 export function normalizeSessionId(value: string): string | null {
   const id = value.trim()
+  if (ULID_LIKE.test(id)) return id
   if (NANO_ID.test(id)) return id
   if (UUID.test(id)) return id.toLowerCase()
   return null

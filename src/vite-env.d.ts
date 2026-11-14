@@ -1,16 +1,16 @@
 interface ImportMetaEnv {
-  readonly VITE_APINATOR_APP_KEY?: string
-  readonly VITE_APINATOR_APP_SECRET?: string
   /** BotFather bot username (no @). Prefer .env; config.json in local dev. */
   readonly VITE_TELEGRAM_BOT_USERNAME?: string
   /** BotFather Mini App short_name for t.me/<bot>/<short_name>. */
   readonly VITE_TELEGRAM_MINI_APP_SHORT_NAME?: string
   /** Human-readable Mini App title from BotFather. */
   readonly VITE_TELEGRAM_MINI_APP_TITLE?: string
-  /** WebTransport (QUIC/UDP) relay URL. */
-  readonly VITE_RELAY_WEBTRANSPORT_URL?: string
-  /** WebSocket fallback relay URL. */
-  readonly VITE_RELAY_WEBSOCKET_URL?: string
+  /** Game lobby HTTP base (Create/Join). */
+  readonly VITE_GAME_HTTP_URL?: string
+  /** Play WebTransport origin (scheme+host+port); Join paths + relay WT resolve here. */
+  readonly VITE_GAME_WEBTRANSPORT_URL?: string
+  /** Play WebSocket origin (scheme+host+port); Join paths + relay WS resolve here. */
+  readonly VITE_GAME_WEBSOCKET_URL?: string
   /** First 6 characters of the commit planted by the Pages build. */
   readonly VITE_BUILD_COMMIT: string
   /** `git log -1` text planted beside the short commit. */

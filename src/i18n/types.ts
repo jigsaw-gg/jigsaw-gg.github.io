@@ -23,31 +23,9 @@ export interface Messages {
     light: string
     dark: string
   }
-  connection: {
-    starting: string
-    connecting: string
-    connected: string
-    disconnected: string
-    unavailable: string
-    pill: (label: string) => string
-  }
   network: {
     title: string
     lede: string
-    cluster: string
-    channel: string
-    event: string
-    subscription: string
-    socket: string
-    appKey: string
-    failed: string
-    subscribed: string
-    subscribing: string
-    waiting: string
-    mock: string
-    notConfigured: string
-    recent: string
-    empty: string
   }
   about: {
     title: string
@@ -75,6 +53,9 @@ export interface Messages {
     relayStatusDisconnected: string
     relayStatusFailed: string
     relayTransportNone: string
+    optionsTitle: string
+    optionsWebTransport: string
+    optionsWebSocket: string
   }
   puzzles: {
     title: string
@@ -91,6 +72,8 @@ export interface Messages {
     pieceCount: (count: number) => string
     seed: string
     start: string
+    starting: string
+    createFailed: string
     imageError: string
   }
   player: {
@@ -108,6 +91,7 @@ export interface Messages {
     join: string
     sessionTitle: string
     sourcePeer: string
+    sourceServer: string
     sourceLocal: string
     sourceWaiting: string
     players: string
@@ -123,6 +107,8 @@ export interface Messages {
     channelStatus: string
     joined: string
     failed: string
+    expired: string
+    expiredLede: string
     joining: string
     image: string
     pieces: string

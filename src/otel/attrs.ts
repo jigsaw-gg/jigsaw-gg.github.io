@@ -2,3 +2,5 @@
 export const TAB_ID_ATTR = 'jigsaw.tab.id'
 /** Set while a puzzle play session is active. */
 export const SESSION_ID_ATTR = 'jigsaw.session.id'
+/** Live play transport while connected (`webtransport` / `websocket`). */
+export const TRANSPORT_ATTR = 'jigsaw.transport'

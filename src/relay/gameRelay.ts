@@ -6,6 +6,7 @@ import {
   type PongResponse,
 } from '../gen/relay_pb.ts'
 import { event, withSpan } from '../otel/index.ts'
+import { isWebTransportEnabled } from '../transportPrefs.ts'
 import {
   RELAY_ROOM,
   RELAY_WEBSOCKET_URL,
@@ -506,7 +507,9 @@ async function connect(gen: number): Promise<void> {
     setStatus('connecting')
     commit({ transportType: null, error: null, latencyMs: null })
 
-    if (await connectWebTransport(gen)) {
+    const wtEnabled = isWebTransportEnabled()
+    span.setAttribute('wtEnabled', wtEnabled)
+    if (wtEnabled && (await connectWebTransport(gen))) {
       span.setAttribute('transport', 'webtransport')
       if (gen === generation) await sendPing()
       return

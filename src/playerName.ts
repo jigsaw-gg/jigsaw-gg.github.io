@@ -51,17 +51,21 @@ export function writePlayerName(name: string): void {
   }
 }
 
-/** Stable id for this browser so a renamed player stays one person in the session. */
+/**
+ * Stable id for this tab so a renamed player stays one person in the session.
+ * Uses sessionStorage (not localStorage) so two tabs can join the same game as
+ * two players during local co-op testing.
+ */
 export function readPlayerId(): string {
   try {
-    const raw = localStorage.getItem(ID_KEY)
+    const raw = sessionStorage.getItem(ID_KEY)
     if (raw && PLAYER_ID.test(raw)) return raw
   } catch {
     // Fall through and issue a new id for this page load.
   }
   const id = nanoid(21)
   try {
-    localStorage.setItem(ID_KEY, id)
+    sessionStorage.setItem(ID_KEY, id)
   } catch {
     // The id still distinguishes this tab until it is closed.
   }

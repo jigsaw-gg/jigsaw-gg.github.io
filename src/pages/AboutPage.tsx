@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { useI18n } from '../i18n/useI18n.ts'
 import { useGameRelay } from '../relay/useGameRelay.ts'
 import type { RelayStatus } from '../relay/types.ts'
 import { playTelegramInviteUrl } from '../telegram/config.ts'
 import { readTelegramDebugInfo } from '../telegram/webApp.ts'
+import {
+  isWebTransportEnabled,
+  setWebTransportEnabled,
+  subscribeWebTransportEnabled,
+} from '../transportPrefs.ts'
 
 function relayStatusLabel(
   status: RelayStatus,
@@ -43,41 +48,85 @@ export function AboutPage() {
   const relay = useGameRelay()
   const about = messages.about
   const tone = relayTone(relay.status)
+  const webTransportEnabled = useSyncExternalStore(
+    subscribeWebTransportEnabled,
+    isWebTransportEnabled,
+    () => true,
+  )
 
   return (
     <main className="page">
       <h1>{about.title}</h1>
       <p className="lede">{about.lede}</p>
-      {commit ? (
-        <p className="about-version">
-          <span className="about-version__label">{about.version}</span>{' '}
-          <code className="about-version__commit">{commit}</code>
-        </p>
-      ) : null}
-      {commitLog ? (
-        <div
-          className={
-            commitOpen ? 'about-commit about-commit--open' : 'about-commit'
-          }
+      {commit || commitLog ? (
+        <section
+          className="status-card about-commit-section"
+          aria-labelledby="about-commit-title"
         >
-          <pre id="about-commit-log" className="about-commit__log">
-            {commitLog}
-          </pre>
-          <button
-            type="button"
-            className="button about-commit__toggle"
-            aria-expanded={commitOpen}
-            aria-controls="about-commit-log"
-            onClick={() => setCommitOpen((open) => !open)}
-          >
-            {commitOpen ? about.commitHide : about.commitShow}
-          </button>
-        </div>
+          <div className="status-card__header">
+            <h2 id="about-commit-title">{about.version}</h2>
+          </div>
+          {commit ? (
+            <p className="about-version">
+              <code className="about-version__commit">{commit}</code>
+            </p>
+          ) : null}
+          {commitLog ? (
+            <div
+              className={
+                commitOpen ? 'about-commit about-commit--open' : 'about-commit'
+              }
+            >
+              <pre id="about-commit-log" className="about-commit__log">
+                {commitLog}
+              </pre>
+              <button
+                type="button"
+                className="button about-commit__toggle"
+                aria-expanded={commitOpen}
+                aria-controls="about-commit-log"
+                onClick={() => setCommitOpen((open) => !open)}
+              >
+                {commitOpen ? about.commitHide : about.commitShow}
+              </button>
+            </div>
+          ) : null}
+        </section>
       ) : null}
 
-      <section className="status-card about-relay" aria-live="polite">
+      <section
+        className="status-card about-options"
+        aria-labelledby="about-options-title"
+      >
         <div className="status-card__header">
-          <h2>{about.relayTitle}</h2>
+          <h2 id="about-options-title">{about.optionsTitle}</h2>
+        </div>
+        <div className="about-options__list">
+          <label className="about-options__option">
+            <input
+              type="checkbox"
+              checked={webTransportEnabled}
+              onChange={(event) => {
+                setWebTransportEnabled(event.target.checked)
+                relay.reconnect()
+              }}
+            />
+            {about.optionsWebTransport}
+          </label>
+          <label className="about-options__option">
+            <input type="checkbox" checked disabled />
+            {about.optionsWebSocket}
+          </label>
+        </div>
+      </section>
+
+      <section
+        className="status-card about-relay"
+        aria-labelledby="about-relay-title"
+        aria-live="polite"
+      >
+        <div className="status-card__header">
+          <h2 id="about-relay-title">{about.relayTitle}</h2>
           <span className={`badge badge--${tone}`}>
             {relayStatusLabel(relay.status, about)}
           </span>
@@ -165,8 +214,13 @@ export function AboutPage() {
         )}
       </section>
 
-      <section className="about-telegram" aria-label={about.telegramDebug}>
-        <h2>{about.telegramDebug}</h2>
+      <section
+        className="status-card about-telegram"
+        aria-labelledby="about-telegram-title"
+      >
+        <div className="status-card__header">
+          <h2 id="about-telegram-title">{about.telegramDebug}</h2>
+        </div>
         <dl className="facts">
           <div>
             <dt>miniApp</dt>
@@ -263,9 +317,7 @@ export function AboutPage() {
             </dd>
           </div>
         </dl>
-        <h3 className="about-telegram__subheading">
-          {about.telegramUrlParams}
-        </h3>
+        <h3 className="status-card__subtitle">{about.telegramUrlParams}</h3>
         {telegram.urlLaunchParams.length === 0 ? (
           <p className="muted">{about.telegramUrlParamsEmpty}</p>
         ) : (

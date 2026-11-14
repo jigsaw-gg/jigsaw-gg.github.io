@@ -35,35 +35,13 @@ export const ru: Messages = {
     light: 'Светлая',
     dark: 'Тёмная',
   },
-  connection: {
-    starting: 'Запуск',
-    connecting: 'Подключение',
-    connected: 'Подключено',
-    disconnected: 'Отключено',
-    unavailable: 'Недоступно',
-    pill: (label) => `Apinator ${label}`,
-  },
   network: {
     title: 'Состояние сети',
-    lede: 'Соединение с Apinator в этом браузере: кластер, канал, подписка и недавние сообщения.',
-    cluster: 'Кластер',
-    channel: 'Канал',
-    event: 'Событие',
-    subscription: 'Подписка',
-    socket: 'Сокет',
-    appKey: 'Ключ приложения',
-    failed: 'Ошибка',
-    subscribed: 'Подписано',
-    subscribing: 'Подписка…',
-    waiting: 'Ожидание соединения',
-    mock: 'Локальная заглушка',
-    notConfigured: 'Не задан',
-    recent: 'Недавние сообщения my-event',
-    empty: 'Сообщений пока нет.',
+    lede: 'Проверка релей-транспорта в этом браузере: WebTransport предпочтителен, WebSocket — запасной, RTT по ping/pong.',
   },
   about: {
     title: 'О сайте',
-    lede: 'Временная страница. Сайт будет на jigsaw-gg.github.io. В шапке переключается системная, светлая и тёмная тема, а на странице состояния сети показана связь с Apinator.',
+    lede: 'Временная страница. Сайт будет на jigsaw-gg.github.io. В шапке переключается системная, светлая и тёмная тема. Страница сети проверяет игровой релей.',
     version: 'Версия',
     commitShow: 'Показать коммит',
     commitHide: 'Скрыть коммит',
@@ -87,6 +65,9 @@ export const ru: Messages = {
     relayStatusDisconnected: 'Отключено',
     relayStatusFailed: 'Ошибка',
     relayTransportNone: '—',
+    optionsTitle: 'Параметры',
+    optionsWebTransport: 'WebTransport',
+    optionsWebSocket: 'WebSocket',
   },
   puzzles: {
     title: 'Новый пазл',
@@ -103,6 +84,8 @@ export const ru: Messages = {
     pieceCount: (count) => `${count} ${ruPieces(count)}`,
     seed: 'Зерно',
     start: 'Начать',
+    starting: 'Создание…',
+    createFailed: 'Не удалось создать игру на сервере.',
     imageError: 'Не удалось загрузить это изображение.',
   },
   player: {
@@ -122,13 +105,13 @@ export const ru: Messages = {
     sessionTitle: 'Сессия пазла',
     sourcePeer:
       'Настройки пришли от подключённого игрока и сохранены в этом браузере.',
-    sourceLocal:
-      'Настройки сохранены в этом браузере. Подключённые игроки могут их запросить.',
-    sourceWaiting:
-      'Ожидание подключённого игрока, у которого уже есть эта сессия.',
+    sourceServer:
+      'Настройки получены с игрового сервера и сохранены в этом браузере.',
+    sourceLocal: 'Настройки закэшированы в этом браузере с прошлого визита.',
+    sourceWaiting: 'Подключение к игре на сервере…',
     players: 'Игроки',
     persistence:
-      'Положения деталей сохраняются в этом браузере. Закрытие вкладки или потеря связи не сбрасывает пазл. Ведущий разрешает спор, когда двое игроков одновременно подтверждают одну деталь. Более новый ход заменяет более старый.',
+      'Сервер хранит живую доску. Этот браузер также кэширует настройки локально на 24 часа бездействия.',
     waitingOthers: 'Ожидание других игроков.',
     invite: 'Ссылка-приглашение',
     inviteTelegram: 'Приглашение Telegram Mini App',
@@ -140,12 +123,14 @@ export const ru: Messages = {
     channelStatus: 'Состояние канала',
     joined: 'Подключено',
     failed: 'Ошибка',
+    expired: 'Истекла',
+    expiredLede:
+      'Этой игры больше нет на сервере. Создайте новый пазл на главной странице.',
     joining: 'Подключение…',
     image: 'Изображение',
     pieces: 'Детали',
     seed: 'Зерно',
-    asking:
-      'Запрос у подключённых игроков изображения, размера, числа деталей и зерна.',
+    asking: 'Загрузка настроек с игрового сервера…',
     playArea: 'Игровое поле',
     imageError: 'Не удалось загрузить изображение пазла.',
     back: 'Назад',
@@ -171,8 +156,8 @@ export const ru: Messages = {
     },
   },
   errors: {
-    appKeyMissing: 'Ключ приложения не задан.',
+    appKeyMissing: 'URL игрового сервера не задан.',
     connection: 'Ошибка соединения',
-    channelJoin: 'Не удалось подключиться к закрытому каналу.',
+    channelJoin: 'Не удалось подключиться к игре.',
   },
 }

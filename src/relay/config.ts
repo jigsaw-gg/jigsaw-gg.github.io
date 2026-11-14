@@ -1,14 +1,8 @@
-const DEFAULT_WEBTRANSPORT_URL = 'https://jigsaw-gg.duckdns.org:31100/relay'
-const DEFAULT_WEBSOCKET_URL = 'ws://jigsaw-gg.duckdns.org:21100/ws'
-const DEFAULT_ROOM = 'default'
+import { GAME_WEBSOCKET_BASE, GAME_WEBTRANSPORT_BASE } from '../game/config.ts'
 
-function readEnv(name: keyof ImportMetaEnv): string {
-  const raw = import.meta.env[name]
-  if (typeof raw !== 'string') return ''
-  const value = raw.trim()
-  if (value === '' || value === 'undefined' || value === 'null') return ''
-  return value
-}
+const DEFAULT_ROOM = 'default'
+const RELAY_WT_PATH = '/relay'
+const RELAY_WS_PATH = '/ws'
 
 /** Ensure `room` is present so the server joins a known broadcast room. */
 export function withRoom(url: string, room = DEFAULT_ROOM): string {
@@ -19,12 +13,17 @@ export function withRoom(url: string, room = DEFAULT_ROOM): string {
   return parsed.toString()
 }
 
+function joinBasePath(base: string, path: string): string {
+  return new URL(path, base.endsWith('/') ? base : `${base}/`).toString()
+}
+
+/** Relay probe URLs — same host/port as play, fixed `/relay` and `/ws` paths. */
 export const RELAY_WEBTRANSPORT_URL = withRoom(
-  readEnv('VITE_RELAY_WEBTRANSPORT_URL') || DEFAULT_WEBTRANSPORT_URL,
+  joinBasePath(GAME_WEBTRANSPORT_BASE, RELAY_WT_PATH),
 )
 
 export const RELAY_WEBSOCKET_URL = withRoom(
-  readEnv('VITE_RELAY_WEBSOCKET_URL') || DEFAULT_WEBSOCKET_URL,
+  joinBasePath(GAME_WEBSOCKET_BASE, RELAY_WS_PATH),
 )
 
 export const RELAY_ROOM =

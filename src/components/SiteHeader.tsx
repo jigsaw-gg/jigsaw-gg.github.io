@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import type { ConnectionState } from '@apinator/client'
-import { ConnectionPill } from './ConnectionPill.tsx'
 import { FullscreenButton } from './FullscreenButton.tsx'
 import { LanguageSwitcher } from './LanguageSwitcher.tsx'
 import { ThemeSwitcher } from './ThemeSwitcher.tsx'
@@ -9,7 +7,7 @@ import { useI18n } from '../i18n/useI18n.ts'
 
 const COMPACT_NAV = '(max-width: 1100px)'
 
-export function SiteHeader({ state }: { state: ConnectionState }) {
+export function SiteHeader() {
   const { messages } = useI18n()
   const { pathname } = useLocation()
   const [compact, setCompact] = useState(
@@ -137,11 +135,6 @@ export function SiteHeader({ state }: { state: ConnectionState }) {
             Jigsaw
           </NavLink>
           <div className="topbar__tools">
-            {compact ? (
-              <ConnectionPill state={state} compact quiet={open} />
-            ) : (
-              <ConnectionPill state={state} />
-            )}
             <FullscreenButton />
             <button
               ref={menuRef}
@@ -175,7 +168,6 @@ export function SiteHeader({ state }: { state: ConnectionState }) {
           </nav>
           <LanguageSwitcher labeled={compact} />
           <ThemeSwitcher />
-          {compact && <ConnectionPill state={state} />}
         </div>
       </header>
       {open && compact && (
