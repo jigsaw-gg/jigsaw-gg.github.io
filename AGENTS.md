@@ -46,7 +46,9 @@ every category. Call sites always use `withSpan` / `event` / `startSpan` from
 the endpoint is missing or the category is filtered.
 
 Every span carries `jigsaw.tab.id` (new NanoID per document load). While a
-play session is mounted, spans also carry `jigsaw.session.id`.
+play session is mounted, spans also carry `jigsaw.session.id`. A small
+bottom-left overlay shows those ids in local/dev when OTEL is configured; it
+is omitted from production / GitHub Pages builds.
 
 Production / GitHub Pages builds force all OTEL env values empty and skip
 loading the SDK chunk (`import.meta.env.PROD`), so credentials never ship in

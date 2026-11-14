@@ -17,7 +17,6 @@ const SERVICE_NAME = 'jigsaw-gg'
  * GitHub Pages builds). Callers must not import this module statically.
  */
 export function startOtelSdk(config: OtelConfig): void {
-  // Exporter appends `v1/traces` to this base (same as Python OTLP).
   const exporter = new OTLPTraceExporter({
     url: config.endpoint,
     headers: openobserveOtlpHeaders(config.username, config.password),

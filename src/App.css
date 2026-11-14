@@ -1593,3 +1593,44 @@ textarea.gamepad-focused,
     animation: none;
   }
 }
+
+.otel-debug {
+  position: fixed;
+  left: max(0.5rem, env(safe-area-inset-left));
+  bottom: max(0.5rem, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: grid;
+  gap: 0.15rem;
+  max-width: min(22rem, calc(100vw - 1rem));
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.25;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.otel-debug__row {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.otel-debug__key {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.otel-debug__val {
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: inherit;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

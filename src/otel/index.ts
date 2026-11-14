@@ -1,7 +1,12 @@
 export { SESSION_ID_ATTR, TAB_ID_ATTR } from './attrs.ts'
 export type { OtelCategory } from './categories.ts'
 export { OTEL_CATEGORIES } from './categories.ts'
-export { getPuzzleSessionId, setPuzzleSessionId, TAB_ID } from './context.ts'
+export {
+  getPuzzleSessionId,
+  setPuzzleSessionId,
+  subscribePuzzleSessionId,
+  TAB_ID,
+} from './context.ts'
 export type { OtelAttributes, OtelSpan } from './handle.ts'
 export { initOtel } from './init.ts'
 export { event, otelConfigured, startSpan, withSpan } from './runtime.ts'

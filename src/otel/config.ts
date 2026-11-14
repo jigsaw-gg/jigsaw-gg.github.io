@@ -17,8 +17,10 @@ function readEnv(name: keyof ImportMetaEnv): string {
 }
 
 /**
- * OpenObserve HTTP base: `http://host/api/<org>`.
- * The JS OTLP exporter appends `/v1/traces`.
+ * OpenObserve OTLP/HTTP traces URL: `http://host/api/<org>/v1/traces`.
+ *
+ * Unlike the Python exporter, the JS browser OTLP exporter uses an explicit
+ * `url` as-is and does not append `v1/traces`.
  */
 export function openobserveOtlpHttpEndpoint(
   base: string,
@@ -29,6 +31,9 @@ export function openobserveOtlpHttpEndpoint(
   if (!endpoint) return ''
   if (!endpoint.includes('/api/') && org) {
     endpoint = `${endpoint}/api/${org}`
+  }
+  if (!endpoint.endsWith('/v1/traces')) {
+    endpoint = `${endpoint}/v1/traces`
   }
   return endpoint
 }
