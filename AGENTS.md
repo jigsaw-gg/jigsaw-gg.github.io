@@ -62,6 +62,21 @@ Local client and `jigsaw-gg-server` both export into the same traces stream
 `start_time` / `end_time` are **microseconds**; prefer the last 1–2 hours (or
 `StreamSchema` → `doc_time_min` / `doc_time_max` when unsure).
 
+**Search pitfalls (not obvious from the UI):**
+
+- `StreamSchema.doc_time_max` can lag ingest. Using it as `SearchSQL`
+  `end_time` will return **zero hits** for a session the OpenObserve UI still
+  shows. If the user (or UI) finds spans and MCP does not, widen `end_time`
+  well past `doc_time_max` (or use “now” / a generous upper bound) and retry
+  before concluding the session id is wrong.
+- Prefer a count / `GROUP BY` first
+  (`jigsaw_session_id = '…' OR game_id = '…'`) to confirm the window, then
+  aggregates (`histogram(_timestamp, '1 second')`, min/max/avg of `x`/`y`).
+  Do not dump raw `cursor.local` / `cursor.remote` rows unless aggregates are
+  not enough.
+- Client session filter: `jigsaw_session_id`. Server: `game_id`. Same string;
+  OR them when scanning both services in one query.
+
 **Ids (from the bottom-left OTEL overlay or a bug report):**
 
 | Overlay / URL         | Client column                                             | Server column                   |
@@ -88,8 +103,11 @@ ORDER BY _timestamp ASC
 
 Cursor path (category `input`, ~20 Hz max): mover tab emits `cursor.local`
 (`x`/`y` human pointer). Observer tab emits `cursor.remote` (`x`/`y` after
-presentation smoother, `targetX`/`targetY` last tick sample, `remotePlayerId`).
-Compare the same wall-clock window across both `jigsaw_tab_id`s to see lag.
+presentation smoother, `targetX`/`targetY` delayed chase point from
+`MousePathSmoother`, `remotePlayerId`). A sane `target*` with wild `x`/`y`
+points at the smoother, not the wire. Compare the same wall-clock window
+across both `jigsaw_tab_id`s; stationary mover gaps (no `cursor.local`) with
+continuing `cursor.remote` are the usual bounce/lag windows.
 
 **3. Map tab → player_id** (needed for server queries):
 
