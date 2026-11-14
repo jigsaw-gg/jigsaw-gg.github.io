@@ -2,6 +2,7 @@ import { Apinator, type ConnectionState } from '@apinator/client'
 import { APINATOR_APP_SECRET, installLocalPuzzleAuth } from './apinatorAuth.ts'
 import { createMockApinator } from './apinatorMock.ts'
 import { i18nError } from './i18n/errors.ts'
+import { event } from './otel/index.ts'
 
 function readAppKey(): string {
   const raw = import.meta.env.VITE_APINATOR_APP_KEY
@@ -131,6 +132,9 @@ export const apinator: RealtimeClient | null = APINATOR_APP_KEY
     : null
 
 function startApinator(client: RealtimeClient): void {
+  event('networking', 'apinator.connect', {
+    mock: APINATOR_MOCK,
+  })
   client.connect()
 
   const channel = client.subscribe(APINATOR_CHANNEL)
@@ -146,6 +150,10 @@ function startApinator(client: RealtimeClient): void {
   client.bind('state_change', (data) => {
     if (!isStateChange(data)) return
     const connected = data.current === 'connected'
+    event('networking', 'apinator.state_change', {
+      previous: data.previous,
+      current: data.current,
+    })
     commit({
       ...snapshot,
       state: data.current,
@@ -156,14 +164,21 @@ function startApinator(client: RealtimeClient): void {
   })
 
   client.bind('realtime:error', (data) => {
+    event('networking', 'apinator.error', { message: errorText(data) })
     commit({ ...snapshot, error: errorText(data) })
   })
 
   channel.bind('realtime:subscription_succeeded', () => {
+    event('networking', 'apinator.subscription_succeeded', {
+      channel: APINATOR_CHANNEL,
+    })
     commit({ ...snapshot, subscription: 'subscribed' })
   })
 
   channel.bind('realtime:subscription_error', (data) => {
+    event('networking', 'apinator.subscription_error', {
+      message: errorText(data),
+    })
     commit({
       ...snapshot,
       subscription: 'error',
@@ -173,6 +188,7 @@ function startApinator(client: RealtimeClient): void {
 
   channel.bind(APINATOR_EVENT, (data) => {
     if (import.meta.env.DEV) console.log('Received:', data)
+    event('networking', 'apinator.event', { event: APINATOR_EVENT })
     const record: ApinatorEventRecord = {
       id: nextEventId,
       at: new Date().toISOString(),
@@ -190,6 +206,7 @@ function startApinator(client: RealtimeClient): void {
 if (apinator) {
   startApinator(apinator)
 } else {
+  event('networking', 'apinator.unavailable')
   snapshot = {
     state: 'unavailable',
     socketId: null,

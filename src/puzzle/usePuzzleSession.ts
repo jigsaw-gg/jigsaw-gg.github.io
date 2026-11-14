@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { apinator, type RealtimeChannel } from '../apinator.ts'
 import { i18nError } from '../i18n/errors.ts'
+import { event } from '../otel/index.ts'
 import { normalizePlayerName } from '../playerName.ts'
 import { releasePuzzleChannel, retainPuzzleChannel } from './channelRetain.ts'
 import {
@@ -57,6 +58,7 @@ export function usePuzzleSession(
   }, [setup])
 
   useEffect(() => {
+    event('networking', 'session.join', { sessionId })
     const client = apinator
     if (!client) {
       const frame = window.setTimeout(() => {
@@ -106,6 +108,7 @@ export function usePuzzleSession(
       if (setupRef.current) return
       const parsed = parseSetup(data)
       if (!parsed) return
+      event('networking', 'session.offer_received', { sessionId })
       writeSession(sessionId, parsed)
       setupRef.current = parsed
       setSetup(parsed)
@@ -115,6 +118,7 @@ export function usePuzzleSession(
     const onRequest = () => {
       const current = setupRef.current
       if (!current) return
+      event('networking', 'session.offer_sent', { sessionId })
       sendOffer(channel, current)
     }
 
@@ -126,7 +130,13 @@ export function usePuzzleSession(
         name: announced.name,
         seen: Date.now(),
       })
-      if (!prev || prev.name !== announced.name) publishPeers()
+      if (!prev || prev.name !== announced.name) {
+        event('networking', 'session.peer_announce', {
+          sessionId,
+          peerId: announced.playerId,
+        })
+        publishPeers()
+      }
     }
 
     const prunePeers = () => {
@@ -142,6 +152,10 @@ export function usePuzzleSession(
     }
 
     const onReady = () => {
+      event('networking', 'session.channel_ready', {
+        sessionId,
+        channel: puzzleChannelName(sessionId),
+      })
       setPhase('live')
       setChannelError(null)
       requestSetup()
@@ -149,8 +163,10 @@ export function usePuzzleSession(
     }
 
     const onError = (data: unknown) => {
+      const message = subscriptionError(data)
+      event('networking', 'session.channel_error', { sessionId, message })
       setPhase('error')
-      setChannelError(subscriptionError(data))
+      setChannelError(message)
     }
 
     channel.bind(OFFER_EVENT, onOffer)
@@ -169,6 +185,7 @@ export function usePuzzleSession(
     }, REQUEST_INTERVAL_MS)
 
     return () => {
+      event('networking', 'session.leave', { sessionId })
       window.clearTimeout(readyNow)
       window.clearInterval(timer)
       channel.unbind(OFFER_EVENT, onOffer)

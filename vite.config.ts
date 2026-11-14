@@ -98,6 +98,64 @@ function resolveAppSecret(mode: string): string {
   return raw.trim()
 }
 
+type OtelEnv = {
+  endpoint: string
+  username: string
+  password: string
+  organization: string
+  enabledFor: string
+}
+
+/**
+ * Browser OTLP (OpenObserve). Never inlined for production / GitHub Pages —
+ * credentials and the exporter stay out of the published bundle.
+ * Locally, `.env` may use bare `OTEL_*` or `VITE_OTEL_*` names.
+ */
+function resolveOtel(mode: string): OtelEnv {
+  if (mode === 'production') {
+    return {
+      endpoint: '',
+      username: '',
+      password: '',
+      organization: '',
+      enabledFor: '',
+    }
+  }
+  const fileEnv = loadEnv(mode, process.cwd(), '')
+  const pick = (...keys: string[]) => {
+    for (const key of keys) {
+      const fromProcess = process.env[key]
+      if (typeof fromProcess === 'string' && fromProcess.trim()) {
+        return fromProcess.trim()
+      }
+      const fromFile = fileEnv[key]
+      if (typeof fromFile === 'string' && fromFile.trim()) {
+        return fromFile.trim()
+      }
+    }
+    return ''
+  }
+  return {
+    endpoint: pick(
+      'VITE_OTEL_EXPORTER_OTLP_HTTP_ENDPOINT',
+      'OTEL_EXPORTER_OTLP_HTTP_ENDPOINT',
+    ),
+    username: pick(
+      'VITE_OTEL_OTEL_EXPORTER_OTLP_USERNAME',
+      'OTEL_OTEL_EXPORTER_OTLP_USERNAME',
+    ),
+    password: pick(
+      'VITE_OTEL_OTEL_EXPORTER_OTLP_PASSWORD',
+      'OTEL_OTEL_EXPORTER_OTLP_PASSWORD',
+    ),
+    organization: pick(
+      'VITE_OTEL_OTEL_EXPORTER_OTLP_ORGANIZATION',
+      'OTEL_OTEL_EXPORTER_OTLP_ORGANIZATION',
+    ),
+    enabledFor: pick('VITE_OTEL_ENABLED_FOR', 'OTEL_ENABLED_FOR'),
+  }
+}
+
 type LocalConfig = {
   telegram_bot_username?: string
   telegram_mini_app_short_name?: string
@@ -319,6 +377,7 @@ export default defineConfig(({ mode }) => {
   const port = worktreeDevPort()
   const build = resolveBuildInfo()
   const telegram = resolveTelegramIdentity(mode)
+  const otel = resolveOtel(mode)
   const https = lanHttpsOptions()
   const worktreeServer =
     port === undefined
@@ -360,6 +419,18 @@ export default defineConfig(({ mode }) => {
       ),
       'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(build.commit),
       'import.meta.env.VITE_BUILD_COMMIT_LOG': JSON.stringify(build.log),
+      'import.meta.env.VITE_OTEL_EXPORTER_OTLP_HTTP_ENDPOINT': JSON.stringify(
+        otel.endpoint,
+      ),
+      'import.meta.env.VITE_OTEL_OTEL_EXPORTER_OTLP_USERNAME': JSON.stringify(
+        otel.username,
+      ),
+      'import.meta.env.VITE_OTEL_OTEL_EXPORTER_OTLP_PASSWORD': JSON.stringify(
+        otel.password,
+      ),
+      'import.meta.env.VITE_OTEL_OTEL_EXPORTER_OTLP_ORGANIZATION':
+        JSON.stringify(otel.organization),
+      'import.meta.env.VITE_OTEL_ENABLED_FOR': JSON.stringify(otel.enabledFor),
     },
   }
 })

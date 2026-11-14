@@ -1,3 +1,4 @@
+import { withSpan } from '../otel/index.ts'
 import { mixSeed, mulberry32 } from './random.ts'
 import type { PuzzleSetup } from './session.ts'
 
@@ -129,6 +130,15 @@ function betterGrid(next: readonly number[], best: readonly number[]): boolean {
 }
 
 export function buildPuzzle(setup: PuzzleSetup): PuzzleModel {
+  return withSpan('piece-logic', 'puzzle.build', () => buildPuzzleBody(setup), {
+    pieceCount: setup.pieceCount,
+    imageWidth: setup.imageWidth,
+    imageHeight: setup.imageHeight,
+    seed: setup.seed,
+  })
+}
+
+function buildPuzzleBody(setup: PuzzleSetup): PuzzleModel {
   const { cols, rows } = chooseGrid(
     setup.pieceCount,
     setup.imageWidth,

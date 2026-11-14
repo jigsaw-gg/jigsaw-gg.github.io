@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '../apinator.ts'
 import { useI18n } from '../i18n/useI18n.ts'
+import { event } from '../otel/index.ts'
 import { buildPuzzle } from './cut.ts'
 import { releasePuzzleChannel, retainPuzzleChannel } from './channelRetain.ts'
 import {
@@ -241,10 +242,12 @@ export function useWorldSync(
       if (!state || !geo) return
       const data = encodePlacements(state.placements, geo.cols, geo.rows)
       if (!data) return
+      const hash = hashEncoded(data)
+      event('networking', 'world.broadcast', { hash })
       trigger(channel, WORLD_EVENT, {
         p: playerRef.current.id,
         r: maxRev(state.placements),
-        h: hashEncoded(data),
+        h: hash,
         d: data,
       })
     }
@@ -276,6 +279,10 @@ export function useWorldSync(
       const hash = hashEncoded(data)
       const changed = hash !== state.hash
       if (!changed) return
+      event('networking', 'world.adopt', {
+        authorId: wire.p,
+        hash,
+      })
       const dragging = localDrag
       if (
         dragging &&
@@ -431,6 +438,10 @@ export function useWorldSync(
       },
       reportDragEnd(placements) {
         const held = localDrag
+        event('piece-logic', 'world.drag_end', {
+          anchorId: held?.anchorId ?? '',
+          group: held?.group ?? '',
+        })
         const anchorPacket = dragSender.flushAnchor()
         if (held && anchorPacket) {
           sendDrag(held.anchorId, held.group, held.members, anchorPacket)
@@ -438,6 +449,7 @@ export function useWorldSync(
         commit(placements)
       },
       reportDragCancel() {
+        event('piece-logic', 'world.drag_cancel')
         localDrag = null
         dragSender.reset()
         window.clearTimeout(dragStopTimer)
@@ -732,12 +744,12 @@ function strip(placements: readonly StampedPlacement[]): Placement[] {
 
 function trigger(
   channel: RealtimeChannel | null,
-  event: string,
+  eventName: string,
   data: unknown,
 ): void {
   if (!channel?.subscribed) return
   try {
-    channel.trigger(event, data)
+    channel.trigger(eventName, data)
   } catch {
     // Subscription can flap while the socket reconnects.
   }

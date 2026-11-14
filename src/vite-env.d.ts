@@ -15,4 +15,11 @@ interface ImportMetaEnv {
   readonly VITE_BUILD_COMMIT: string
   /** `git log -1` text planted beside the short commit. */
   readonly VITE_BUILD_COMMIT_LOG: string
+  /** OpenObserve / OTLP HTTP base. Empty in production / Pages builds. */
+  readonly VITE_OTEL_EXPORTER_OTLP_HTTP_ENDPOINT?: string
+  readonly VITE_OTEL_OTEL_EXPORTER_OTLP_USERNAME?: string
+  readonly VITE_OTEL_OTEL_EXPORTER_OTLP_PASSWORD?: string
+  readonly VITE_OTEL_OTEL_EXPORTER_OTLP_ORGANIZATION?: string
+  /** Semicolon-separated categories, or empty/`all` for every category. */
+  readonly VITE_OTEL_ENABLED_FOR?: string
 }

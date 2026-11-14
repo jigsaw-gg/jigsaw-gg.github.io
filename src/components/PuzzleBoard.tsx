@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { isExpanded } from '../fullscreen.ts'
 import { GAMEPAD_POINTER } from '../input/dualshock.ts'
 import { getState as getGamepadState } from '../input/gamepadHandler.ts'
+import { event as otelEvent } from '../otel/index.ts'
 import { FullscreenButton } from './FullscreenButton.tsx'
 import { WinCelebration } from './WinCelebration.tsx'
 import { useI18n } from '../i18n/useI18n.ts'
@@ -924,6 +925,12 @@ function PuzzleTable({
 
   function finishDrag(commit: boolean) {
     if (!dragRef.current) return
+    const drag = dragRef.current
+    otelEvent('input', 'piece.drag_end', {
+      pieceId: drag.id,
+      group: drag.group,
+      commit,
+    })
     dragRef.current = null
     clearHandover()
     showCruiseStick(null)
@@ -1382,6 +1389,12 @@ function PuzzleTable({
       thumb,
       handoverSince: null,
     }
+    otelEvent('input', 'piece.drag_start', {
+      pieceId: id,
+      group: placement.group,
+      pointerType: event.pointerType,
+      cruise,
+    })
     if (cruise) beginCruise(event.clientX, event.clientY)
     setFrontGroup(placement.group)
     setDragGroup(placement.group)
@@ -1473,7 +1486,13 @@ function PuzzleTable({
       ? moveGroup(result.placements, drag.group, drag.id, held.x, held.y)
       : result.placements
     const anchor = placements.find((piece) => piece.id === drag.id)
-    if (result.snapped && anchor) drag.group = anchor.group
+    if (result.snapped && anchor) {
+      otelEvent('piece-logic', 'puzzle.snap', {
+        pieceId: drag.id,
+        group: anchor.group,
+      })
+      drag.group = anchor.group
+    }
     placementsRef.current = placements
     rememberMembers(drag)
     setPlacements(placements)

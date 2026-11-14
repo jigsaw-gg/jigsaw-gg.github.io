@@ -5,6 +5,7 @@ import {
   type PingRequest,
   type PongResponse,
 } from '../gen/relay_pb.ts'
+import { event, withSpan } from '../otel/index.ts'
 import {
   RELAY_ROOM,
   RELAY_WEBSOCKET_URL,
@@ -501,24 +502,29 @@ async function connectWebSocket(gen: number): Promise<boolean> {
 }
 
 async function connect(gen: number): Promise<void> {
-  setStatus('connecting')
-  commit({ transportType: null, error: null, latencyMs: null })
+  await withSpan('networking', 'relay.connect', async (span) => {
+    setStatus('connecting')
+    commit({ transportType: null, error: null, latencyMs: null })
 
-  if (await connectWebTransport(gen)) {
-    if (gen === generation) await sendPing()
-    return
-  }
+    if (await connectWebTransport(gen)) {
+      span.setAttribute('transport', 'webtransport')
+      if (gen === generation) await sendPing()
+      return
+    }
 
-  if (gen !== generation) return
+    if (gen !== generation) return
 
-  if (await connectWebSocket(gen)) {
-    if (gen === generation) await sendPing()
-    return
-  }
+    if (await connectWebSocket(gen)) {
+      span.setAttribute('transport', 'websocket')
+      if (gen === generation) await sendPing()
+      return
+    }
 
-  if (gen !== generation) return
-  setStatus('failed', 'Could not connect via WebTransport or WebSocket')
-  pushLog('info', 'All transports failed')
+    if (gen !== generation) return
+    span.setAttribute('transport', 'none')
+    setStatus('failed', 'Could not connect via WebTransport or WebSocket')
+    pushLog('info', 'All transports failed')
+  })
 }
 
 export function getGameRelaySnapshot(): RelaySnapshot {
@@ -564,6 +570,7 @@ export function setAutoPing(enabled: boolean): void {
 }
 
 export function startGameRelay(): void {
+  event('networking', 'relay.start')
   generation += 1
   const gen = generation
   stopAutoPingTimer()
@@ -578,6 +585,7 @@ export function startGameRelay(): void {
 }
 
 export function stopGameRelay(): void {
+  event('networking', 'relay.stop')
   generation += 1
   stopAutoPingTimer()
   closeSockets()

@@ -4,6 +4,7 @@
  * and restart on gamepadconnected.
  */
 
+import { event } from '../otel/index.ts'
 import {
   type SonyReading,
   gamepadBusy,
@@ -142,6 +143,10 @@ export function subscribe(
 /** Install once: start polling and restart when a pad connects. */
 export function install(): void {
   if (typeof navigator === 'undefined' || !navigator.getGamepads) return
+  event('input', 'gamepad.install')
   start()
-  window.addEventListener('gamepadconnected', start)
+  window.addEventListener('gamepadconnected', () => {
+    event('input', 'gamepad.connected')
+    start()
+  })
 }

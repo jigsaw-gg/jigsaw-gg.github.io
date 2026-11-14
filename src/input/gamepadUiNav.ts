@@ -4,6 +4,7 @@
  * Disabled while the puzzle board owns the pad (.play-mode active).
  */
 
+import { event } from '../otel/index.ts'
 import {
   pickScreenTargetInDirection,
   type PadDirection,
@@ -38,6 +39,7 @@ export function playBoardOwnsPad(): boolean {
 export function installGamepadUiNav(): void {
   if (installed || typeof window === 'undefined') return
   installed = true
+  event('input', 'gamepad_ui.install')
   subscribe(onPad)
   document.addEventListener('focusin', onFocusIn)
 }
@@ -81,7 +83,10 @@ function onPad(): void {
           ? 'up'
           : null
 
-  if (direction) moveFocus(direction)
+  if (direction) {
+    event('input', 'gamepad_ui.move_focus', { direction })
+    moveFocus(direction)
+  }
   if (crossEdge) activateFocused()
 }
 
@@ -166,6 +171,10 @@ function activateFocused(): void {
   }
   if (!el) return
   focusElement(el)
+  event('input', 'gamepad_ui.activate', {
+    tag: el.tagName.toLowerCase(),
+    className: el.className,
+  })
   if (import.meta.env.DEV) {
     console.log(
       `gamepad ui: activate ${el.tagName.toLowerCase()} ${el.className}`,

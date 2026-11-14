@@ -1,31 +1,44 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
-import { I18nProvider } from './i18n/I18nProvider.tsx'
-import { install as installGamepad } from './input/gamepadHandler.ts'
-import { installGamepadUiNav } from './input/gamepadUiNav.ts'
-import {
-  bootstrapTelegramWebApp,
-  readTelegramColorScheme,
-} from './telegram/webApp.ts'
-import {
-  applyResolvedTheme,
-  readThemePreference,
-  resolveTheme,
-} from './theme.ts'
-import { purgeExpiredPuzzleStorage } from './puzzle/storageTtl.ts'
+import { initOtel, event, withSpan } from './otel/index.ts'
 import './index.css'
 
-purgeExpiredPuzzleStorage()
-bootstrapTelegramWebApp()
-if (readThemePreference() === 'system') {
-  const telegramTheme = readTelegramColorScheme()
-  applyResolvedTheme(telegramTheme ?? resolveTheme('system'))
-}
+// OTEL first so networking / input modules that load with App already export.
+await initOtel()
+event('bootstrap', 'app.document_ready')
 
-// Same as Slither's handleInstall: start the pad poller as soon as the page loads.
-installGamepad()
-installGamepadUiNav()
+const [
+  { StrictMode },
+  { createRoot },
+  { default: App },
+  { I18nProvider },
+  gamepad,
+  { installGamepadUiNav },
+  telegram,
+  theme,
+  { purgeExpiredPuzzleStorage },
+] = await Promise.all([
+  import('react'),
+  import('react-dom/client'),
+  import('./App.tsx'),
+  import('./i18n/I18nProvider.tsx'),
+  import('./input/gamepadHandler.ts'),
+  import('./input/gamepadUiNav.ts'),
+  import('./telegram/webApp.ts'),
+  import('./theme.ts'),
+  import('./puzzle/storageTtl.ts'),
+])
+
+withSpan('bootstrap', 'app.bootstrap', () => {
+  purgeExpiredPuzzleStorage()
+  telegram.bootstrapTelegramWebApp()
+  if (theme.readThemePreference() === 'system') {
+    const telegramTheme = telegram.readTelegramColorScheme()
+    theme.applyResolvedTheme(telegramTheme ?? theme.resolveTheme('system'))
+  }
+
+  // Same as Slither's handleInstall: start the pad poller as soon as the page loads.
+  gamepad.install()
+  installGamepadUiNav()
+})
 
 if (import.meta.env.DEV) {
   void import('./dev/browserLog.ts').then((mod) => mod.installBrowserLog())

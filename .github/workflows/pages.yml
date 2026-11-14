@@ -3,6 +3,8 @@
 # (Settings → Secrets and variables → Actions → Variables).
 # The build inlines both. The page signs private-channel subscriptions
 # locally; GitHub Pages has no auth route. Do not read either value from secrets.
+# OTEL is never inlined here: vite production mode clears OTEL_* so the Pages
+# bundle has no exporter credentials or SDK chunk.
 #
 # The same build plants the first 6 characters of the commit and the
 # `git log -1` text as Vite constants for the About page.

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
 import { useI18n } from '../i18n/useI18n.ts'
+import { event } from '../otel/index.ts'
 import {
   normalizePlayerName,
   readPlayerName,
@@ -86,6 +87,11 @@ export function PuzzlesPage() {
       pieceCount: count,
       seed,
     }
+    event('bootstrap', 'puzzle.create', {
+      sessionId,
+      pieceCount: count,
+      seed,
+    })
     writeSession(sessionId, setup)
     navigate(playInvitePath(sessionId))
   }

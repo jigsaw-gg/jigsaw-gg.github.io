@@ -1,3 +1,4 @@
+import { event, withSpan } from '../otel/index.ts'
 import type { PuzzleModel } from './cut.ts'
 import { mixSeed, mulberry32 } from './random.ts'
 
@@ -193,6 +194,20 @@ export function scatterPieces(
   model: PuzzleModel,
   seed: number,
 ): ScatteredBoard {
+  return withSpan(
+    'piece-logic',
+    'puzzle.scatter',
+    () => scatterPiecesBody(model, seed),
+    {
+      cols: model.cols,
+      rows: model.rows,
+      pieces: model.pieces.length,
+      seed,
+    },
+  )
+}
+
+function scatterPiecesBody(model: PuzzleModel, seed: number): ScatteredBoard {
   const { cols, rows, cellW, cellH, pad, pieces } = model
   const gapX = cellW * SLOT_GAP
   const gapY = cellH * SLOT_GAP
@@ -525,6 +540,10 @@ export function pullToNeighbors(
       piece.group === best.neighborGroup ? { ...piece, group } : piece,
     )
     snapped = true
+    event('piece-logic', 'puzzle.group_merge', {
+      group,
+      neighborGroup: best.neighborGroup,
+    })
   }
   return { placements: current, near: null, snapped }
 }

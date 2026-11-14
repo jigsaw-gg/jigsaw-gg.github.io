@@ -5,6 +5,7 @@ import { PuzzleBoard } from '../components/PuzzleBoard.tsx'
 import { localizeError } from '../i18n/errors.ts'
 import { useI18n } from '../i18n/useI18n.ts'
 import type { Messages } from '../i18n/types.ts'
+import { setPuzzleSessionId } from '../otel/index.ts'
 import {
   clearConfirmedPlayerName,
   normalizePlayerName,
@@ -165,6 +166,10 @@ function PlaySession({
   const { messages } = useI18n()
   const text = messages.play
   const [playerId] = useState(readPlayerId)
+  useEffect(() => {
+    setPuzzleSessionId(sessionId)
+    return () => setPuzzleSessionId(null)
+  }, [sessionId])
   const { setup, phase, channelError, channelName, source, players } =
     usePuzzleSession(sessionId, { id: playerId, name: playerName })
   const world = useWorldSync(

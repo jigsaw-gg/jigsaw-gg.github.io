@@ -31,6 +31,27 @@ Chromium only exposes the Gamepad API in a secure context. `http://127.0.0.1` co
 
 Do not add a separate HTTPS npm package for this. Cert material is written under `tmp/` (`dev-key.pem`, `dev-cert.pem`); that directory is gitignored — never commit it.
 
+## OpenTelemetry (local / worktree only)
+
+The browser exports traces directly to OpenObserve over OTLP/HTTP when
+`OTEL_EXPORTER_OTLP_HTTP_ENDPOINT` is set (same env shape as
+`openttd-private` grpc/python controllers: Basic auth from
+`OTEL_OTEL_EXPORTER_OTLP_{USERNAME,PASSWORD}`, org in the `/api/<org>` path via
+`OTEL_OTEL_EXPORTER_OTLP_ORGANIZATION`).
+
+`OTEL_ENABLED_FOR` is a semicolon-separated category list
+(`bootstrap`, `networking`, `piece-logic`, `input`). Empty or `all` enables
+every category. Call sites always use `withSpan` / `event` / `startSpan` from
+`src/otel/` — they never branch on whether OTEL is on; the helpers no-op when
+the endpoint is missing or the category is filtered.
+
+Every span carries `jigsaw.tab.id` (new NanoID per document load). While a
+play session is mounted, spans also carry `jigsaw.session.id`.
+
+Production / GitHub Pages builds force all OTEL env values empty and skip
+loading the SDK chunk (`import.meta.env.PROD`), so credentials never ship in
+the published bundle. OpenObserve must allow browser CORS for local ingest.
+
 ## Apinator
 
 The app key is public. Vite inlines it from `VITE_APINATOR_APP_KEY` or `APINATOR_APP_KEY` (local `.env`, or the `APINATOR_APP_KEY` repository variable in `.github/workflows/pages.yml`). Keep the key out of source files. The Pages build reads that variable only and fails when it is missing.
