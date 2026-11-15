@@ -67,6 +67,22 @@ function githubPagesSpaFallback(): Plugin {
 }
 
 /**
+ * Case-insensitive checkouts (macOS default) cannot hold both `agents.md` and
+ * `AGENTS.md` in `public/`. Pages is Linux/case-sensitive, so emit the
+ * uppercase twin from the lowercase source at build time.
+ */
+function duplicateAgentsMd(): Plugin {
+  return {
+    name: 'duplicate-agents-md',
+    apply: 'build',
+    writeBundle() {
+      const outDir = resolve('dist')
+      copyFileSync(resolve(outDir, 'agents.md'), resolve(outDir, 'AGENTS.md'))
+    },
+  }
+}
+
+/**
  * Short commit and `git log -1` text. The Pages workflow plants
  * BUILD_COMMIT (first 6 characters of GITHUB_SHA) and BUILD_COMMIT_LOG.
  * A local build reads git when those are absent.
@@ -249,6 +265,7 @@ export default defineConfig(({ mode }) => {
       react(),
       shareImageCacheBust(),
       githubPagesSpaFallback(),
+      duplicateAgentsMd(),
       browserLogPlugin(),
     ],
     define: {
