@@ -1,6 +1,5 @@
 import { event, withSpan } from '../otel/index.ts'
-import type { PuzzleModel } from '../jigsaw/cut.ts'
-import { mixSeed, mulberry32 } from '../jigsaw/random.ts'
+import { mixSeed, mulberry32, type PuzzleModel } from '../jigsaw/index.ts'
 
 const SLOT_GAP = 0.28 * 2
 const SLOT_JITTER = 0.08

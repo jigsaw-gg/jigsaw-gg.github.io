@@ -20,7 +20,7 @@ import {
   isImmersive,
   setImmersive,
 } from '../../fullscreen.ts'
-import { chooseGrid } from '../../jigsaw/cut.ts'
+import { chooseGrid } from '../../jigsaw/index.ts'
 import { useGameSession } from '../../play/useGameSession.ts'
 import { useGameWorld } from '../../play/useGameWorld.ts'
 import { normalizeSessionId, playInvitePath } from '../../play/session.ts'

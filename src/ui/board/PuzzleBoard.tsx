@@ -34,7 +34,7 @@ import {
   type EdgeBounds,
   type EdgePull,
 } from './edgeCruise.ts'
-import { buildPuzzle } from '../../jigsaw/cut.ts'
+import { buildPuzzle } from '../../jigsaw/index.ts'
 import {
   approachLimits,
   cameraLimits,

@@ -1,4 +1,4 @@
-export function mulberry32(seed: number): () => number {
+function mulberry32(seed: number): () => number {
   let state = seed >>> 0
   if (state === 0) state = 0x6d2b79f5
   return () => {
@@ -9,7 +9,12 @@ export function mulberry32(seed: number): () => number {
   }
 }
 
-export function mixSeed(seed: number, salt: number): number {
+function mixSeed(seed: number, salt: number): number {
   const mixed = Math.imul((seed >>> 0) ^ (salt >>> 0), 0x9e3779b1) >>> 0
   return mixed === 0 ? 1 : mixed
+}
+
+export const jigsawRandomImpl = {
+  mulberry32,
+  mixSeed,
 }

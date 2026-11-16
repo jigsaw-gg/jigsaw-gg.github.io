@@ -1,4 +1,4 @@
-import type { PieceModel, Point } from '../jigsaw/cut.ts'
+import type { PieceModel, Point } from '../jigsaw/index.ts'
 import { clearCanvas, layoutCanvas } from './canvas.ts'
 
 export function drawPiece(

@@ -1,29 +1,9 @@
 import { withSpan } from '../otel/index.ts'
-import { mixSeed, mulberry32 } from './random.ts'
 import type { PuzzleSetup } from '../core/puzzleSetup.ts'
+import type { PieceModel, Point, PuzzleModel } from './models.ts'
+import { jigsawRandomImpl } from './random.impl.ts'
 
-export interface Point {
-  x: number
-  y: number
-}
-
-export interface PieceModel {
-  col: number
-  row: number
-  points: Point[]
-}
-
-export interface PuzzleModel {
-  cols: number
-  rows: number
-  cellW: number
-  cellH: number
-  pad: number
-  pieces: PieceModel[]
-}
-
-/** Columns and rows for nearly square pieces near `pieceCount`. The product may differ. */
-export function chooseGrid(
+function chooseGrid(
   pieceCount: number,
   imageWidth: number,
   imageHeight: number,
@@ -129,13 +109,18 @@ function betterGrid(next: readonly number[], best: readonly number[]): boolean {
   return false
 }
 
-export function buildPuzzle(setup: PuzzleSetup): PuzzleModel {
+function buildPuzzle(setup: PuzzleSetup): PuzzleModel {
   return withSpan('piece-logic', 'puzzle.build', () => buildPuzzleBody(setup), {
     pieceCount: setup.pieceCount,
     imageWidth: setup.imageWidth,
     imageHeight: setup.imageHeight,
     seed: setup.seed,
   })
+}
+
+export const jigsawCutImpl = {
+  chooseGrid,
+  buildPuzzle,
 }
 
 function buildPuzzleBody(setup: PuzzleSetup): PuzzleModel {
@@ -624,5 +609,5 @@ function rngFor(
   b: number,
 ): () => number {
   const salt = kind * 1_000_003 + a * 1_009 + b
-  return mulberry32(mixSeed(seed >>> 0, salt))
+  return jigsawRandomImpl.mulberry32(jigsawRandomImpl.mixSeed(seed >>> 0, salt))
 }

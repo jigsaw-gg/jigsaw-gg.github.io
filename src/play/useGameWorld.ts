@@ -10,7 +10,7 @@ import {
   type Welcome,
 } from '../network/gen/game_pb.ts'
 import { event, setPlayTransport } from '../otel/index.ts'
-import { buildPuzzle } from '../jigsaw/cut.ts'
+import { buildPuzzle } from '../jigsaw/index.ts'
 import { scatterPieces, type Placement } from '../world/placement.ts'
 import type { PuzzleSetup } from './session.ts'
 import {

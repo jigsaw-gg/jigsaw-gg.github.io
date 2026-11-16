@@ -11,7 +11,7 @@ import {
   rememberConfirmedPlayerName,
   writePlayerName,
 } from '../../playerName.ts'
-import { chooseGrid } from '../../jigsaw/cut.ts'
+import { chooseGrid } from '../../jigsaw/index.ts'
 import {
   createSessionId,
   DEFAULT_IMAGE_URL,
