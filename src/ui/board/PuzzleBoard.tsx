@@ -34,7 +34,7 @@ import {
   type EdgeBounds,
   type EdgePull,
 } from './edgeCruise.ts'
-import { buildPuzzle, type PieceModel } from '../../jigsaw/cut.ts'
+import { buildPuzzle } from '../../jigsaw/cut.ts'
 import {
   approachLimits,
   cameraLimits,
@@ -50,7 +50,6 @@ import {
   type Camera,
   type NearPair,
   type Placement,
-  type ScatteredBoard,
 } from '../../world/placement.ts'
 import type { PuzzleSetup } from '../../play/session.ts'
 import {
@@ -63,16 +62,21 @@ import {
   STICK_MAX_SPEED,
   thumbSide,
   twoThumbLayout,
-  type HandoverMarks,
   type StickDisc,
   type ThumbSide,
 } from './twoThumb.ts'
 import type { RemoteCursor } from '../../play/useGameWorld.ts'
 import { hapticImpact, hapticNotification } from '../../telegram/webApp.ts'
-import { drawPiece } from '../../draw/piece.ts'
-
-/** Nearby-piece glow fade, in milliseconds. */
-const GLOW_MS = 260
+import {
+  GamepadIcon,
+  ThumbStick,
+  TriangleGlyph,
+  type HandoverView,
+  type ThumbStickView,
+} from './boardChrome.tsx'
+import { PadGroupHighlight } from './PadGroupHighlight.tsx'
+import { PieceCanvas } from './PieceCanvas.tsx'
+import { RemotePointer } from './RemotePointer.tsx'
 /** How long the controller blink stays up after input starts. */
 const GAMEPAD_BLINK_MS = 3000
 /** Stick must rest this long before a controller drag is saved. */
@@ -117,144 +121,6 @@ function settleSlide(body: SlideOffset, dt: number): void {
 
 function slideResting(body: SlideOffset): boolean {
   return Math.hypot(body.x, body.y) < 0.2 && Math.hypot(body.vx, body.vy) < 4
-}
-
-function easeInOut(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
-}
-
-interface GlowClock {
-  sync: (active: boolean, pulse: number) => void
-  stop: () => void
-}
-
-/**
- * Proximity eases the glow in and, once the piece leaves, back out.
- * Each join adds a cycle that fades all the way in and then all the way
- * out. A later move must not retarget that cycle, or a fast snap finishes
- * before the first frame and the highlight never appears.
- */
-function createGlowClock(publish: (value: number) => void): GlowClock {
-  const glow = {
-    value: 0,
-    phase: 'idle' as 'idle' | 'in' | 'hold' | 'out',
-    from: 0,
-    to: 0,
-    started: 0,
-    active: false,
-    pulse: 0,
-    pending: 0,
-    outPays: false,
-    frame: 0,
-  }
-
-  function kick() {
-    if (glow.frame !== 0) return
-    if (glow.phase !== 'in' && glow.phase !== 'out') return
-    glow.frame = requestAnimationFrame(tick)
-  }
-
-  function tick(now: number) {
-    glow.frame = 0
-    if (glow.phase !== 'in' && glow.phase !== 'out') return
-    const span = glow.to - glow.from
-    const t = Math.min(1, (now - glow.started) / GLOW_MS)
-    const next = glow.from + span * easeInOut(t)
-    glow.value = next
-    publish(next)
-    if (t < 1) {
-      kick()
-      return
-    }
-    finish(now)
-  }
-
-  function finish(now: number) {
-    const pays = glow.phase === 'out' && glow.outPays
-    glow.value = glow.to
-    publish(glow.to)
-    if (pays && glow.pending > 0) glow.pending -= 1
-    glow.outPays = false
-    glow.phase = 'idle'
-    steer(now)
-  }
-
-  function begin(phase: 'in' | 'out', now: number) {
-    glow.phase = phase
-    glow.from = glow.value
-    glow.to = phase === 'in' ? 1 : 0
-    glow.started = now
-    glow.outPays = phase === 'out' && glow.pending > 0
-    if (Math.abs(glow.from - glow.to) < 0.001) {
-      finish(now)
-      return
-    }
-    kick()
-  }
-
-  function steer(now: number) {
-    if (!allowsMotion()) {
-      if (glow.frame !== 0) {
-        cancelAnimationFrame(glow.frame)
-        glow.frame = 0
-      }
-      glow.pending = 0
-      glow.outPays = false
-      glow.phase = glow.active ? 'hold' : 'idle'
-      const next = glow.active ? 1 : 0
-      glow.value = next
-      publish(next)
-      return
-    }
-    if (glow.phase === 'in') {
-      if (!glow.active && glow.pending === 0) begin('out', now)
-      else kick()
-      return
-    }
-    if (glow.phase === 'out') {
-      kick()
-      return
-    }
-    if (glow.pending > 0) {
-      if (glow.value >= 0.999) begin('out', now)
-      else begin('in', now)
-      return
-    }
-    if (glow.active) {
-      if (glow.value < 0.999) begin('in', now)
-      else glow.phase = 'hold'
-      return
-    }
-    if (glow.value > 0.001) begin('out', now)
-  }
-
-  return {
-    sync(active: boolean, pulse: number) {
-      glow.active = active
-      if (pulse > glow.pulse) glow.pending += pulse - glow.pulse
-      glow.pulse = pulse
-      steer(performance.now())
-    },
-    stop() {
-      if (glow.frame === 0) return
-      cancelAnimationFrame(glow.frame)
-      glow.frame = 0
-    },
-  }
-}
-
-function usePieceGlow(active: boolean, pulse: number): number {
-  const [value, setValue] = useState(0)
-  const clock = useRef<GlowClock | null>(null)
-  if (clock.current === null) clock.current = createGlowClock(setValue)
-
-  useEffect(() => {
-    clock.current?.sync(active, pulse)
-  }, [active, pulse])
-
-  useEffect(() => () => clock.current?.stop(), [])
-
-  return value
 }
 
 export function PuzzleBoard({
@@ -2429,225 +2295,6 @@ function PuzzleTable({
   )
 }
 
-function ThumbStick({ stick }: { stick: ThumbStickView }) {
-  const halfStyle: React.CSSProperties =
-    stick.side === 'left'
-      ? { left: 10, width: 'calc(50% - 20px)' }
-      : { left: 'calc(50% + 10px)', width: 'calc(50% - 20px)' }
-  return (
-    <div className="thumb-stick" aria-hidden="true">
-      <div className="thumb-stick__half" style={halfStyle} />
-      <svg className="thumb-stick__arm">
-        <line x1={stick.cx} y1={stick.cy} x2={stick.knobX} y2={stick.knobY} />
-      </svg>
-      <div
-        className="thumb-stick__range"
-        style={{
-          left: stick.cx,
-          top: stick.cy,
-          width: stick.radius * 2,
-          height: stick.radius * 2,
-        }}
-      />
-      <div
-        className="thumb-stick__knob"
-        style={{ left: stick.knobX, top: stick.knobY }}
-      />
-    </div>
-  )
-}
-
-function PadGroupHighlight({
-  placements,
-  group,
-  cellW,
-  cellH,
-  pad,
-  mode,
-}: {
-  placements: readonly Placement[]
-  group: string
-  cellW: number
-  cellH: number
-  pad: number
-  mode: 'selected' | 'hover'
-}) {
-  const bounds = groupWorldBounds(placements, group, cellW, cellH)
-  if (!bounds) return null
-  return (
-    <div
-      className={
-        mode === 'selected'
-          ? 'pad-group-hl pad-group-hl--selected'
-          : 'pad-group-hl pad-group-hl--hover'
-      }
-      aria-hidden="true"
-      style={{
-        left: bounds.minX - pad,
-        top: bounds.minY - pad,
-        width: bounds.maxX - bounds.minX + pad * 2,
-        height: bounds.maxY - bounds.minY + pad * 2,
-      }}
-    />
-  )
-}
-
-function PieceCanvas({
-  image,
-  piece,
-  placement,
-  layout,
-  near,
-  pulse,
-  offsetX,
-  offsetY,
-  raised,
-  dragging,
-  onPointerDown,
-  onPointerMove,
-  onPointerUp,
-}: {
-  image: HTMLImageElement | null
-  piece: PieceModel
-  placement: Placement
-  layout: ScatteredBoard
-  near: boolean
-  pulse: number
-  offsetX: number
-  offsetY: number
-  raised: boolean
-  dragging: boolean
-  onPointerDown: (
-    event: React.PointerEvent<HTMLCanvasElement>,
-    id: string,
-  ) => void
-  onPointerMove: (event: React.PointerEvent<HTMLCanvasElement>) => void
-  onPointerUp: (event: React.PointerEvent<HTMLCanvasElement>) => void
-}) {
-  const { messages } = useI18n()
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const { cellW, cellH, pad } = layout
-  const width = cellW + pad * 2
-  const height = cellH + pad * 2
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || !image) return
-    drawPiece(canvas, image, piece, cellW, cellH, pad)
-  }, [image, piece, cellW, cellH, pad])
-
-  const glow = usePieceGlow(near, pulse)
-  const className = ['piece', dragging ? 'piece--dragging' : '']
-    .filter(Boolean)
-    .join(' ')
-  const shift =
-    Math.hypot(offsetX, offsetY) > 0.05
-      ? `translate(${offsetX}px, ${offsetY}px)`
-      : undefined
-  const style: React.CSSProperties & { '--piece-glow': number } = {
-    left: placement.x - pad,
-    top: placement.y - pad,
-    width,
-    height,
-    zIndex: raised ? 3 : near || glow > 0.04 ? 2 : 1,
-    transform: shift,
-    '--piece-glow': glow,
-  }
-  if (glow <= 0.01) style.filter = 'none'
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className={className}
-      draggable={false}
-      role="img"
-      data-piece={placement.id}
-      data-near={near ? 'true' : 'false'}
-      aria-label={messages.play.piece(piece.row + 1, piece.col + 1)}
-      style={style}
-      onPointerDown={(event) => onPointerDown(event, placement.id)}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    />
-  )
-}
-
-function RemotePointer({
-  cursor,
-  zoom,
-}: {
-  cursor: RemoteCursor
-  zoom: number
-}) {
-  const { messages } = useI18n()
-  const scale = zoom > 0 ? 1 / zoom : 1
-  return (
-    <div
-      className="remote-cursor"
-      role="img"
-      aria-label={messages.play.pointer(cursor.name)}
-      style={{
-        left: cursor.x,
-        top: cursor.y,
-        color: cursor.color,
-        transform: `scale(${scale})`,
-      }}
-    >
-      <svg
-        className="remote-cursor__arrow"
-        width="18"
-        height="18"
-        viewBox="0 0 18 18"
-        aria-hidden="true"
-      >
-        <path
-          d="M1 1 L1 14.2 L4.7 10.6 L8.4 16.2 L10.6 15 L6.9 9.4 L11.6 9 Z"
-          fill="currentColor"
-          stroke="#fff"
-          strokeWidth="1"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <span className="remote-cursor__name">
-        <span>{cursor.name}</span>
-      </span>
-    </div>
-  )
-}
-
-function GamepadIcon() {
-  return (
-    <svg className="gamepad-blink__icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M7.2 7.2h9.6c2.2 0 4.2 1.9 4.2 4.4 0 2.7-1.4 4.9-3.3 4.9-1.1 0-1.8-.6-2.5-1.5l-.6-.8H9.4l-.6.8c-.7.9-1.4 1.5-2.5 1.5-1.9 0-3.3-2.2-3.3-4.9 0-2.5 2-4.4 4.2-4.4z"
-      />
-      <path
-        fill="var(--surface)"
-        d="M8.1 10.2h1.3v1.1h1.1v1.3H9.4v1.1H8.1v-1.1H7v-1.3h1.1zM15.2 11.4a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zm2.2-1.3a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8z"
-      />
-    </svg>
-  )
-}
-
-function TriangleGlyph({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 16 16"
-      width="1em"
-      height="1em"
-      aria-hidden="true"
-    >
-      <path
-        fill="currentColor"
-        d="M8 2.2 14.2 13.4H1.8L8 2.2zm0 2.6L3.9 12.2h8.2L8 4.8z"
-      />
-    </svg>
-  )
-}
-
 interface Drag {
   pointerId: number
   id: string
@@ -2660,21 +2307,6 @@ interface Drag {
   clientY: number
   thumb: ThumbSide | null
   handoverSince: number | null
-}
-
-interface ThumbStickView {
-  side: ThumbSide
-  cx: number
-  cy: number
-  radius: number
-  knobX: number
-  knobY: number
-}
-
-interface HandoverView {
-  marks: HandoverMarks
-  x: number
-  y: number
 }
 
 interface ActiveCruise {

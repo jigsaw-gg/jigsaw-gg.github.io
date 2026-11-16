@@ -1,4 +1,5 @@
 import type { PieceModel, Point } from '../jigsaw/cut.ts'
+import { clearCanvas, layoutCanvas } from './canvas.ts'
 
 export function drawPiece(
   canvas: HTMLCanvasElement,
@@ -10,17 +11,9 @@ export function drawPiece(
 ): void {
   const width = cellW + pad * 2
   const height = cellH + pad * 2
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
-  const bitmapW = Math.max(1, Math.round(width * dpr))
-  const bitmapH = Math.max(1, Math.round(height * dpr))
-  if (canvas.width !== bitmapW || canvas.height !== bitmapH) {
-    canvas.width = bitmapW
-    canvas.height = bitmapH
-  }
-  const ctx = canvas.getContext('2d')
+  const ctx = layoutCanvas(canvas, width, height)
   if (!ctx) return
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, width, height)
+  clearCanvas(ctx, width, height)
   const originX = piece.col * cellW - pad
   const originY = piece.row * cellH - pad
   trace(ctx, piece.points, originX, originY)
