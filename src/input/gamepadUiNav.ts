@@ -8,7 +8,7 @@ import { event } from '../otel/index.ts'
 import {
   pickScreenTargetInDirection,
   type PadDirection,
-} from '../puzzle/gamepadView.ts'
+} from './gamepadView.ts'
 import { getState, subscribe } from './gamepadHandler.ts'
 
 const FOCUS_CLASS = 'gamepad-focused'

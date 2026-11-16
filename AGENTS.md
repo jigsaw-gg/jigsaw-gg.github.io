@@ -11,7 +11,11 @@ Vite + React + TypeScript jigsaw, deployed as a static site to GitHub Pages at t
 
 There is no test runner. For a UI change, run the dev server and use the page.
 
-`uvx pre-commit run -a` runs the repo hooks (whitespace, Prettier, ESLint). `./manage.sh pre-commit` runs that same suite after `git add -A`. Use the wrapper only when the user asked for pre-commit.
+`uvx pre-commit run -a` runs the repo hooks (whitespace, Prettier, ESLint). `./manage.sh pre-commit` runs that same suite after `git add -A`. Use the wrapper only when the user asked for pre-commit. ESLint includes `eslint-plugin-boundaries` (package import matrix); the `eslint-local` pre-commit hook runs the same `npx eslint .`.
+
+## Source packages
+
+Target layout under `src/`: `core`, `otel`, `network`, `jigsaw`, `world`, `draw`, `input`, `play`, `debug`, `ui`, plus bootstrap `app` (`main.tsx` / `App.tsx`). **Default forbid** cross-package imports; allowed edges and migration notes live in [`dev/architecture.md`](dev/architecture.md). Prefer each package’s `index.ts` as the public surface; impl files must not import their own `index.ts`. Legacy folders (`game/`, `puzzle/`, `components/`, …) remain until migrated and are not boundary-checked yet.
 
 ## Dev server port
 
@@ -169,7 +173,7 @@ Client config (local `.env` or Pages variables):
 - `VITE_GAME_HTTP_URL` — lobby base (`http://127.0.0.1:21100` locally)
 - `VITE_GAME_WEBTRANSPORT_URL` / `VITE_GAME_WEBSOCKET_URL` — play + relay origins (scheme/host/port). Relay probe appends `/relay` and `/ws`.
 
-Proto sources live in `jigsaw-gg-server`; `./scripts/gen-proto.sh` copies them and regenerates `src/gen/*_pb.ts`. Keep `proto/game.proto` in sync with the server.
+Proto sources live in `jigsaw-gg-server`; `./scripts/gen-proto.sh` copies them and regenerates `src/network/gen/*_pb.ts`. Keep `proto/game.proto` in sync with the server.
 
 A worktree may copy `.env` from the main checkout via `scripts/setup-worktree.sh`. Point that env at a running local `jigsaw-gg-server`.
 

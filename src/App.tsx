@@ -6,16 +6,16 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom'
-import { EmbeddedSafariWarning } from './components/EmbeddedSafariWarning.tsx'
-import { OtelDebugOverlay } from './components/OtelDebugOverlay.tsx'
-import { SiteHeader } from './components/SiteHeader.tsx'
-import { AboutPage } from './pages/AboutPage.tsx'
-import { NetworkStatusPage } from './pages/NetworkStatusPage.tsx'
-import { PlayPage } from './pages/PlayPage.tsx'
-import { PuzzlesPage } from './pages/PuzzlesPage.tsx'
-import { normalizeSessionId, playInvitePath } from './puzzle/session.ts'
+import { EmbeddedSafariWarning } from './ui/components/EmbeddedSafariWarning.tsx'
+import { OtelDebugOverlay } from './ui/components/OtelDebugOverlay.tsx'
+import { SiteHeader } from './ui/components/SiteHeader.tsx'
+import { AboutPage } from './ui/pages/AboutPage.tsx'
+import { NetworkStatusPage } from './ui/pages/NetworkStatusPage.tsx'
+import { PlayPage } from './ui/pages/PlayPage.tsx'
+import { PuzzlesPage } from './ui/pages/PuzzlesPage.tsx'
+import { normalizeSessionId, playInvitePath } from './play/session.ts'
 import { TelegramUi } from './telegram/TelegramUi.tsx'
-import './relay/gameRelay.ts'
+import './ui/ensureDebugRelay.ts'
 import './App.css'
 
 function PlayInviteRoute() {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { normalizeSessionId, playInvitePath } from '../puzzle/session.ts'
+import { normalizeSessionId, playInvitePath } from '../play/session.ts'
 import { TelegramUiContext } from './TelegramUiContext.ts'
 import {
   bootstrapTelegramWebApp,

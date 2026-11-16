@@ -1,4 +1,4 @@
-import { createUlidLikeId } from '../id.ts'
+import { createUlidLikeId } from '../core/id.ts'
 import { SESSION_ID_ATTR, TAB_ID_ATTR, TRANSPORT_ATTR } from './attrs.ts'
 
 /** Stable for this document load; new tab / hard refresh gets a new id. */

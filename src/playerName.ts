@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid'
-import { nicknameFor } from './i18n/nicknames.ts'
-import type { Locale } from './i18n/locale.ts'
+import { nicknameFor } from './ui/i18n/nicknames.ts'
+import type { Locale } from './ui/i18n/locale.ts'
 
 export const MAX_PLAYER_NAME_LENGTH = 40
 

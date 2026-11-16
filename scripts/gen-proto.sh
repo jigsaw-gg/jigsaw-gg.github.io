@@ -34,12 +34,12 @@ mkdir -p proto
 # Preserve relative paths under proto/ (currently flat; nested stays nested).
 rsync -a --include='*/' --include='*.proto' --exclude='*' "${SERVER_DIR}/proto/" proto/
 
-echo "Generating Connect-ES / Protobuf-ES into src/gen/"
-rm -rf src/gen
-mkdir -p src/gen
+echo "Generating Connect-ES / Protobuf-ES into src/network/gen/"
+rm -rf src/network/gen
+mkdir -p src/network/gen
 npx buf generate
 
 echo "Formatting generated TypeScript"
-npx prettier --write --config .prettierrc "src/gen/**/*.{ts,tsx}"
+npx prettier --write --config .prettierrc "src/network/gen/**/*.{ts,tsx}"
 
 echo "Done."

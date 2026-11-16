@@ -3,7 +3,7 @@
 version: v2
 plugins:
   - local: protoc-gen-es
-    out: src/gen
+    out: src/network/gen
     opt:
       - target=ts
       - import_extension=ts

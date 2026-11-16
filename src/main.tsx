@@ -19,12 +19,12 @@ const [
   import('react'),
   import('react-dom/client'),
   import('./App.tsx'),
-  import('./i18n/I18nProvider.tsx'),
+  import('./ui/i18n/I18nProvider.tsx'),
   import('./input/gamepadHandler.ts'),
   import('./input/gamepadUiNav.ts'),
   import('./telegram/webApp.ts'),
   import('./theme.ts'),
-  import('./puzzle/storageTtl.ts'),
+  import('./play/storageTtl.ts'),
 ])
 
 withSpan('bootstrap', 'app.bootstrap', () => {
