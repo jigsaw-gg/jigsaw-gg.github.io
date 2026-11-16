@@ -1,6 +1,6 @@
-import { padGroupHighlightBox } from '../../draw/index.ts'
-import { groupWorldBounds } from '../../input/gamepadView.ts'
-import type { Placement } from '../../world/placement.ts'
+import { padGroupHighlightBox } from '../../../draw/index.ts'
+import { groupWorldBounds } from '../../../input/gamepadView.ts'
+import type { Placement } from '../../../world/placement.ts'
 
 export function PadGroupHighlight({
   placements,

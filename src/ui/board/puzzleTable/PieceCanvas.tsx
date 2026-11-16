@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
-import type { PieceModel } from '../../jigsaw/index.ts'
-import { drawPiece } from '../../draw/index.ts'
-import type { Placement, ScatteredBoard } from '../../world/placement.ts'
-import { useI18n } from '../i18n/useI18n.ts'
+import type { PieceModel } from '../../../jigsaw/index.ts'
+import { drawPiece } from '../../../draw/index.ts'
+import type { Placement, ScatteredBoard } from '../../../world/placement.ts'
+import { useI18n } from '../../i18n/useI18n.ts'
 import { usePieceGlow } from './pieceGlow.ts'
 
 export function PieceCanvas({

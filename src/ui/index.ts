@@ -1,5 +1,5 @@
 /** React/DOM UI. See `dev/architecture.md`. */
-export { PuzzleBoard } from './board/PuzzleBoard.tsx'
+export { PuzzleBoard } from './board/puzzleTable/index.ts'
 export { PlayPage } from './pages/PlayPage.tsx'
 export { PuzzlesPage } from './pages/PuzzlesPage.tsx'
 export { AboutPage } from './pages/AboutPage.tsx'

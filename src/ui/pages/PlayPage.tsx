@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
-import { PuzzleBoard } from '../board/PuzzleBoard.tsx'
+import { PuzzleBoard } from '../board/puzzleTable/index.ts'
 import { localizeError } from '../i18n/errors.ts'
 import { useI18n } from '../i18n/useI18n.ts'
 import type { Messages } from '../i18n/types.ts'

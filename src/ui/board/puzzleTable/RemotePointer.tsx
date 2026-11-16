@@ -1,9 +1,9 @@
 import {
   REMOTE_POINTER_ARROW_PATH,
   REMOTE_POINTER_VIEW_SIZE,
-} from '../../draw/index.ts'
-import type { RemoteCursor } from '../../play/useGameWorld.ts'
-import { useI18n } from '../i18n/useI18n.ts'
+} from '../../../draw/index.ts'
+import type { RemoteCursor } from '../../../play/useGameWorld.ts'
+import { useI18n } from '../../i18n/useI18n.ts'
 
 export function RemotePointer({
   cursor,
