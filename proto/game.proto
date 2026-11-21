@@ -65,7 +65,8 @@ service GameSync {
 // Which QUIC bidi stream a frame belongs on (best-case WebTransport).
 enum StreamKind {
   STREAM_KIND_UNSPECIFIED = 0;
-  // Client→server: Heartbeat, CursorUpdate, Claim, Release, MoveHeld, Merge, Rename.
+  // Client→server: Heartbeat, CursorUpdate, Claim, Release, MoveHeld, Merge,
+  // Rename, RotateHeld.
   // Server→client: ClaimResult, MergeResult, HeartbeatAck, urgent GameEvent.
   STREAM_KIND_INPUT = 1;
   // Server→client: Welcome, Tick (~10 Hz), PresenceUpdate, non-urgent GameEvent.
@@ -93,6 +94,11 @@ message PuzzleSetup {
   // Requested piece budget; actual grid is cols*rows from server/client cut.
   uint32 piece_count = 4;
   uint32 seed = 5;
+  // Rotation mode. True: the server deals every piece a random orientation
+  // (PieceState.rotation) and accepts RotateHeld. False (the default, and every
+  // game created before this field existed): all pieces stay at rotation 0 and
+  // RotateHeld is ignored.
+  bool rotation_enabled = 6;
 }
 
 message CreateGameRequest {
@@ -207,6 +213,16 @@ enum TransportKind {
 // Piece identity is row-major index: index = row * cols + col.
 // Group id is the piece index of the group representative (same as today's
 // client `group` field mapped through pieceIndex).
+//
+// Orientation: `rotation` counts clockwise quarter turns on screen (y grows
+// downward), 0..3, 0 = upright as cut. x_q/y_q stay the top-left corner of the
+// piece's *upright* cell box and the piece turns about that box's centre, so
+// turning a single piece does not move it. Every member of a group has the
+// same rotation.
+//
+// One quarter turn of a vector is R(x, y) = (-y, x). Pieces a and b with grid
+// offset (dc, dr) = (col_b - col_a, row_b - row_a) and common rotation r are
+// joined when pos_b - pos_a = R^r(dc * cell_w, dr * cell_h).
 
 message PieceState {
   uint32 piece_index = 1;
@@ -215,6 +231,8 @@ message PieceState {
   int32 y_q = 3;
   uint32 group_id = 4;
   uint32 rev = 5;
+  // Clockwise quarter turns, 0..3. Absent ⇒ 0.
+  uint32 rotation = 6;
 }
 
 message BoardSnapshot {
@@ -227,6 +245,8 @@ message HeldGroup {
   uint32 anchor_piece_index = 2;
   uint32 group_id = 3;
   repeated uint32 member_piece_indices = 4;
+  // Current rotation of the held group (changes on RotateHeld).
+  uint32 rotation = 5;
 }
 
 // ===== Motion (client compression + server repair share this shape) =========
@@ -281,6 +301,7 @@ message ClientEnvelope {
     // World-stream uplink only (best-case WT).
     ResyncRequest resync = 17;
     StreamPace pace = 18;
+    RotateHeld rotate = 19;
   }
 }
 
@@ -315,7 +336,9 @@ message ClaimControl {
 message ReleaseControl {
   // Empty → release everything this player holds.
   repeated uint32 piece_indices = 1;
-  // Final resting pose for released pieces (authoritative commit).
+  // Final resting pose for released pieces (authoritative commit). Only
+  // x_q/y_q are committed; `rotation` is ignored here and changes only through
+  // RotateHeld.
   repeated PieceState final_poses = 2;
 }
 
@@ -328,7 +351,11 @@ message MoveHeld {
 }
 
 // Join one held group (or free group) onto another. Server validates geometry
-// / ownership and either applies or rejects.
+// / ownership and either applies or rejects. Both groups must have the same
+// rotation (reject_reason "rotation mismatch"); the neighbour gap is measured
+// at the turned offset (see PieceState). A rejected merge leaves the board
+// untouched. After an accepted merge the sender holds the resulting group and
+// that hold keeps its anchor piece.
 // Client snap adopts target_group_id as the surviving local group id for every
 // member of both sides (moving pieces are retagged; target id is unchanged).
 message MergeGroups {
@@ -337,10 +364,32 @@ message MergeGroups {
   // Optional explicit member lists when client is unsure of server grouping.
   repeated uint32 moving_member_indices = 3;
   repeated uint32 target_member_indices = 4;
-  // Pose of moving group at merge attempt (anchor quantized).
+  // Pose of the sender's held anchor piece (HeldGroup.anchor_piece_index) at
+  // the merge attempt, quantized.
   int32 moving_anchor_x_q = 5;
   int32 moving_anchor_y_q = 6;
   uint64 client_merge_id = 7;
+}
+
+// Turn a group the sender holds by clockwise quarter turns about one of its
+// pieces: the pivot keeps its x_q/y_q, every other member moves to
+// pivot + R^turns(member - pivot), and every member's rotation becomes
+// (rotation + turns) mod 4. On quantized poses this is exact, so four turns
+// restore every position. Ignored unless the game has
+// PuzzleSetup.rotation_enabled and the sender holds the group. No reply: the
+// new orientation shows in Tick.holdings[].rotation and, once released, in
+// PieceState.rotation.
+message RotateHeld {
+  // Pivot piece; becomes the hold's anchor, as in MoveHeld. The group turned
+  // is the one this piece belongs to on the server's board, when the sender
+  // holds it.
+  uint32 anchor_piece_index = 1;
+  // Advisory, like MoveHeld.group_id: the client's id for a group can lag the
+  // server's after a merge. Used only when anchor_piece_index does not name a
+  // piece the sender holds; the pivot is then that hold's anchor.
+  uint32 group_id = 2;
+  // Clockwise quarter turns, taken mod 4 (3 = one counter-clockwise turn).
+  uint32 quarter_turns = 3;
 }
 
 message RenamePlayer {

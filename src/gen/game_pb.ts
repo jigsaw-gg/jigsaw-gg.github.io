@@ -22,7 +22,7 @@ import type { Message, UnknownEnum } from '@bufbuild/protobuf'
 export const file_game: GenFile =
   /*@__PURE__*/
   fileDesc(
-    'CgpnYW1lLnByb3RvEgdnYW1lLnYxIq4BCgtTdHJlYW1GcmFtZRIjCgZzdHJlYW0YASABKA4yEy5nYW1lLnYxLlN0cmVhbUtpbmQSCwoDc2VxGAIgASgEEg8KB3RpbWVfbXMYAyABKAMSKQoGY2xpZW50GAogASgLMhcuZ2FtZS52MS5DbGllbnRFbnZlbG9wZUgAEikKBnNlcnZlchgLIAEoCzIXLmdhbWUudjEuU2VydmVyRW52ZWxvcGVIAEIGCgRib2R5Im4KC1B1enpsZVNldHVwEhEKCWltYWdlX3VybBgBIAEoCRITCgtpbWFnZV93aWR0aBgCIAEoDRIUCgxpbWFnZV9oZWlnaHQYAyABKA0SEwoLcGllY2VfY291bnQYBCABKA0SDAoEc2VlZBgFIAEoDSKCAQoRQ3JlYXRlR2FtZVJlcXVlc3QSDwoHZ2FtZV9pZBgBIAEoCRIZChFjcmVhdG9yX3BsYXllcl9pZBgCIAEoCRIcChRjcmVhdG9yX2Rpc3BsYXlfbmFtZRgDIAEoCRIjCgVzZXR1cBgEIAEoCzIULmdhbWUudjEuUHV6emxlU2V0dXAilAEKEkNyZWF0ZUdhbWVSZXNwb25zZRIPCgdnYW1lX2lkGAEgASgJEiMKBXNldHVwGAIgASgLMhQuZ2FtZS52MS5QdXp6bGVTZXR1cBIVCg1jcmVhdGVkX2F0X21zGAMgASgDEhUKDWV4cGlyZXNfYXRfbXMYBCABKAMSDAoEY29scxgFIAEoDRIMCgRyb3dzGAYgASgNIiEKDkdldEdhbWVSZXF1ZXN0Eg8KB2dhbWVfaWQYASABKAkivQEKD0dldEdhbWVSZXNwb25zZRIPCgdnYW1lX2lkGAEgASgJEiMKBXNldHVwGAIgASgLMhQuZ2FtZS52MS5QdXp6bGVTZXR1cBIVCg1jcmVhdGVkX2F0X21zGAMgASgDEhUKDWV4cGlyZXNfYXRfbXMYBCABKAMSDAoEY29scxgFIAEoDRIMCgRyb3dzGAYgASgNEhkKEWNyZWF0b3JfcGxheWVyX2lkGAcgASgJEg8KB2V4cGlyZWQYCCABKAgihgEKD0pvaW5HYW1lUmVxdWVzdBIPCgdnYW1lX2lkGAEgASgJEhEKCXBsYXllcl9pZBgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSOQoTcHJlZmVycmVkX3RyYW5zcG9ydBgEIAEoDjIcLmdhbWUudjEuVHJhbnNwb3J0UHJlZmVyZW5jZSLPAgoQSm9pbkdhbWVSZXNwb25zZRIPCgdnYW1lX2lkGAEgASgJEhEKCXBsYXllcl9pZBgCIAEoCRIjCgVzZXR1cBgDIAEoCzIULmdhbWUudjEuUHV6emxlU2V0dXASDAoEY29scxgEIAEoDRIMCgRyb3dzGAUgASgNEhYKDnNlcnZlcl90aW1lX21zGAYgASgDEhUKDWV4cGlyZXNfYXRfbXMYByABKAMSJQoFYm9hcmQYCCABKAsyFi5nYW1lLnYxLkJvYXJkU25hcHNob3QSJAoHcGxheWVycxgJIAMoCzITLmdhbWUudjEuUGxheWVySW5mbxIkCgRwbGF5GAogASgLMhYuZ2FtZS52MS5QbGF5RW5kcG9pbnRzEjQKFG5lZ290aWF0ZWRfdHJhbnNwb3J0GAsgASgOMhYuZ2FtZS52MS5UcmFuc3BvcnRLaW5kIkAKDVBsYXlFbmRwb2ludHMSGAoQd2VidHJhbnNwb3J0X3VybBgBIAEoCRIVCg13ZWJzb2NrZXRfdXJsGAIgASgJIjYKEExlYXZlR2FtZVJlcXVlc3QSDwoHZ2FtZV9pZBgBIAEoCRIRCglwbGF5ZXJfaWQYAiABKAkiEwoRTGVhdmVHYW1lUmVzcG9uc2UiRQoKUGxheWVySW5mbxIRCglwbGF5ZXJfaWQYASABKAkSFAoMZGlzcGxheV9uYW1lGAIgASgJEg4KBm9ubGluZRgDIAEoCCJaCgpQaWVjZVN0YXRlEhMKC3BpZWNlX2luZGV4GAEgASgNEgsKA3hfcRgCIAEoBRILCgN5X3EYAyABKAUSEAoIZ3JvdXBfaWQYBCABKA0SCwoDcmV2GAUgASgNIkcKDUJvYXJkU25hcHNob3QSEQoJYm9hcmRfcmV2GAEgASgEEiMKBnBpZWNlcxgCIAMoCzITLmdhbWUudjEuUGllY2VTdGF0ZSJqCglIZWxkR3JvdXASEQoJcGxheWVyX2lkGAEgASgJEhoKEmFuY2hvcl9waWVjZV9pbmRleBgCIAEoDRIQCghncm91cF9pZBgDIAEoDRIcChRtZW1iZXJfcGllY2VfaW5kaWNlcxgEIAMoDSK3AQoMTW90aW9uU2FtcGxlEgwKBGhpZGUYASABKAgSDgoGYW5jaG9yGAIgASgIEhAKCGFic29sdXRlGAMgASgIEgsKA3hfcRgEIAEoBRILCgN5X3EYBSABKAUSDQoFZHRfbXMYBiABKA0SDAoEdnhfcRgHIAEoBRIMCgR2eV9xGAggASgFEgwKBGF4X3EYCSABKAUSDAoEYXlfcRgKIAEoBRIWCg5jbGllbnRfdGltZV9tcxgLIAEoDSLOAwoOQ2xpZW50RW52ZWxvcGUSDwoHZ2FtZV9pZBgBIAEoCRIRCglwbGF5ZXJfaWQYAiABKAkSCwoDc2VxGAMgASgEEhYKDmNsaWVudF90aW1lX21zGAQgASgDEicKCWhlYXJ0YmVhdBgKIAEoCzISLmdhbWUudjEuSGVhcnRiZWF0SAASJwoGY3Vyc29yGAsgASgLMhUuZ2FtZS52MS5DdXJzb3JVcGRhdGVIABImCgVjbGFpbRgMIAEoCzIVLmdhbWUudjEuQ2xhaW1Db250cm9sSAASKgoHcmVsZWFzZRgNIAEoCzIXLmdhbWUudjEuUmVsZWFzZUNvbnRyb2xIABImCgltb3ZlX2hlbGQYDiABKAsyES5nYW1lLnYxLk1vdmVIZWxkSAASJQoFbWVyZ2UYDyABKAsyFC5nYW1lLnYxLk1lcmdlR3JvdXBzSAASJwoGcmVuYW1lGBAgASgLMhUuZ2FtZS52MS5SZW5hbWVQbGF5ZXJIABIoCgZyZXN5bmMYESABKAsyFi5nYW1lLnYxLlJlc3luY1JlcXVlc3RIABIjCgRwYWNlGBIgASgLMhMuZ2FtZS52MS5TdHJlYW1QYWNlSABCBgoEYm9keSI9Cg1SZXN5bmNSZXF1ZXN0EhQKDGxhc3RfdGlja19pZBgBIAEoBBIWCg5sYXN0X2JvYXJkX3JldhgCIAEoBCIpCgpTdHJlYW1QYWNlEhsKE2J1ZmZlcmVkX3RpY2tfY291bnQYASABKA0iGgoJSGVhcnRiZWF0Eg0KBW5vbmNlGAEgASgJIjUKDEN1cnNvclVwZGF0ZRIlCgZtb3Rpb24YASABKAsyFS5nYW1lLnYxLk1vdGlvblNhbXBsZSJaCgxDbGFpbUNvbnRyb2wSFQoNcGllY2VfaW5kaWNlcxgBIAMoDRIaChJhbmNob3JfcGllY2VfaW5kZXgYAiABKA0SFwoPY2xpZW50X2NsYWltX2lkGAMgASgEIlEKDlJlbGVhc2VDb250cm9sEhUKDXBpZWNlX2luZGljZXMYASADKA0SKAoLZmluYWxfcG9zZXMYAiADKAsyEy5nYW1lLnYxLlBpZWNlU3RhdGUifQoITW92ZUhlbGQSGgoSYW5jaG9yX3BpZWNlX2luZGV4GAEgASgNEhAKCGdyb3VwX2lkGAIgASgNEhwKFG1lbWJlcl9waWVjZV9pbmRpY2VzGAMgAygNEiUKBm1vdGlvbhgEIAEoCzIVLmdhbWUudjEuTW90aW9uU2FtcGxlIswBCgtNZXJnZUdyb3VwcxIXCg9tb3ZpbmdfZ3JvdXBfaWQYASABKA0SFwoPdGFyZ2V0X2dyb3VwX2lkGAIgASgNEh0KFW1vdmluZ19tZW1iZXJfaW5kaWNlcxgDIAMoDRIdChV0YXJnZXRfbWVtYmVyX2luZGljZXMYBCADKA0SGQoRbW92aW5nX2FuY2hvcl94X3EYBSABKAUSGQoRbW92aW5nX2FuY2hvcl95X3EYBiABKAUSFwoPY2xpZW50X21lcmdlX2lkGAcgASgEIiQKDFJlbmFtZVBsYXllchIUCgxkaXNwbGF5X25hbWUYASABKAki9QIKDlNlcnZlckVudmVsb3BlEg8KB2dhbWVfaWQYASABKAkSCwoDc2VxGAIgASgEEhYKDnNlcnZlcl90aW1lX21zGAMgASgDEiMKB3dlbGNvbWUYCiABKAsyEC5nYW1lLnYxLldlbGNvbWVIABIdCgR0aWNrGAsgASgLMg0uZ2FtZS52MS5UaWNrSAASLAoMY2xhaW1fcmVzdWx0GAwgASgLMhQuZ2FtZS52MS5DbGFpbVJlc3VsdEgAEiwKDG1lcmdlX3Jlc3VsdBgNIAEoCzIULmdhbWUudjEuTWVyZ2VSZXN1bHRIABIrCghwcmVzZW5jZRgOIAEoCzIXLmdhbWUudjEuUHJlc2VuY2VVcGRhdGVIABIoCgpnYW1lX2V2ZW50GA8gASgLMhIuZ2FtZS52MS5HYW1lRXZlbnRIABIuCg1oZWFydGJlYXRfYWNrGBAgASgLMhUuZ2FtZS52MS5IZWFydGJlYXRBY2tIAEIGCgRib2R5IoQCCgdXZWxjb21lEhEKCXBsYXllcl9pZBgBIAEoCRIlCgVib2FyZBgCIAEoCzIWLmdhbWUudjEuQm9hcmRTbmFwc2hvdBIkCgdwbGF5ZXJzGAMgAygLMhMuZ2FtZS52MS5QbGF5ZXJJbmZvEiQKCGhvbGRpbmdzGAQgAygLMhIuZ2FtZS52MS5IZWxkR3JvdXASDwoHdGlja19oehgFIAEoDRIcChRoZWFydGJlYXRfdGltZW91dF9tcxgGIAEoDRIZChFkdWFsX2JpZGlfc3RyZWFtcxgHIAEoCBIpCgl0cmFuc3BvcnQYCCABKA4yFi5nYW1lLnYxLlRyYW5zcG9ydEtpbmQisQEKBFRpY2sSDwoHdGlja19pZBgBIAEoBBIRCglib2FyZF9yZXYYAiABKAQSJAoHcGxheWVycxgDIAMoCzITLmdhbWUudjEuUGxheWVyUG9zZRIpCgxwaWVjZV9kZWx0YXMYBCADKAsyEy5nYW1lLnYxLlBpZWNlU3RhdGUSJAoIaG9sZGluZ3MYBSADKAsyEi5nYW1lLnYxLkhlbGRHcm91cBIOCgZyZXN5bmMYBiABKAgiwAEKClBsYXllclBvc2USEQoJcGxheWVyX2lkGAEgASgJEiUKBmN1cnNvchgCIAEoCzIVLmdhbWUudjEuTW90aW9uU2FtcGxlEiMKBGhlbGQYAyABKAsyFS5nYW1lLnYxLk1vdGlvblNhbXBsZRIfChdoZWxkX2FuY2hvcl9waWVjZV9pbmRleBgEIAEoDRIVCg1oZWxkX2dyb3VwX2lkGAUgASgNEhsKE2hlbGRfbWVtYmVyX2luZGljZXMYBiADKA0ijwEKC0NsYWltUmVzdWx0EhcKD2NsaWVudF9jbGFpbV9pZBgBIAEoBBIQCghhY2NlcHRlZBgCIAEoCBIdChVncmFudGVkX3BpZWNlX2luZGljZXMYAyADKA0SHAoUZGVuaWVkX3BpZWNlX2luZGljZXMYBCADKA0SGAoQaG9sZGVyX3BsYXllcl9pZBgFIAEoCSKwAQoLTWVyZ2VSZXN1bHQSFwoPY2xpZW50X21lcmdlX2lkGAEgASgEEhAKCGFjY2VwdGVkGAIgASgIEhoKEnJlc3VsdGluZ19ncm91cF9pZBgDIAEoDRIcChRtZW1iZXJfcGllY2VfaW5kaWNlcxgEIAMoDRIlCgVib2FyZBgFIAEoCzIWLmdhbWUudjEuQm9hcmRTbmFwc2hvdBIVCg1yZWplY3RfcmVhc29uGAYgASgJIlIKDlByZXNlbmNlVXBkYXRlEiQKB3BsYXllcnMYASADKAsyEy5nYW1lLnYxLlBsYXllckluZm8SGgoScmVtb3ZlZF9wbGF5ZXJfaWRzGAIgAygJIocCCglHYW1lRXZlbnQSJQoEa2luZBgBIAEoDjIXLmdhbWUudjEuR2FtZUV2ZW50LktpbmQSDwoHbWVzc2FnZRgCIAEoCRIeChZyZWxlYXNlZF9waWVjZV9pbmRpY2VzGAMgAygNEiUKBWJvYXJkGAQgASgLMhYuZ2FtZS52MS5Cb2FyZFNuYXBzaG90InsKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEhUKEUtJTkRfR0FNRV9FWFBJUkVEEAESFAoQS0lORF9ST09NX0NMT1NFRBACEhYKEktJTkRfRk9SQ0VfUkVMRUFTRRADEhgKFEtJTkRfUkVTWU5DX1JFUVVJUkVEEAQiNQoMSGVhcnRiZWF0QWNrEg0KBW5vbmNlGAEgASgJEhYKDnNlcnZlcl90aW1lX21zGAIgASgDKlcKClN0cmVhbUtpbmQSGwoXU1RSRUFNX0tJTkRfVU5TUEVDSUZJRUQQABIVChFTVFJFQU1fS0lORF9JTlBVVBABEhUKEVNUUkVBTV9LSU5EX1dPUkxEEAIqpQEKE1RyYW5zcG9ydFByZWZlcmVuY2USJAogVFJBTlNQT1JUX1BSRUZFUkVOQ0VfVU5TUEVDSUZJRUQQABIlCiFUUkFOU1BPUlRfUFJFRkVSRU5DRV9XRUJUUkFOU1BPUlQQARIiCh5UUkFOU1BPUlRfUFJFRkVSRU5DRV9XRUJTT0NLRVQQAhIdChlUUkFOU1BPUlRfUFJFRkVSRU5DRV9BVVRPEAMqbgoNVHJhbnNwb3J0S2luZBIeChpUUkFOU1BPUlRfS0lORF9VTlNQRUNJRklFRBAAEh8KG1RSQU5TUE9SVF9LSU5EX1dFQlRSQU5TUE9SVBABEhwKGFRSQU5TUE9SVF9LSU5EX1dFQlNPQ0tFVBACMpcCCgtHYW1lU2Vzc2lvbhJFCgpDcmVhdGVHYW1lEhouZ2FtZS52MS5DcmVhdGVHYW1lUmVxdWVzdBobLmdhbWUudjEuQ3JlYXRlR2FtZVJlc3BvbnNlEjwKB0dldEdhbWUSFy5nYW1lLnYxLkdldEdhbWVSZXF1ZXN0GhguZ2FtZS52MS5HZXRHYW1lUmVzcG9uc2USPwoISm9pbkdhbWUSGC5nYW1lLnYxLkpvaW5HYW1lUmVxdWVzdBoZLmdhbWUudjEuSm9pbkdhbWVSZXNwb25zZRJCCglMZWF2ZUdhbWUSGS5nYW1lLnYxLkxlYXZlR2FtZVJlcXVlc3QaGi5nYW1lLnYxLkxlYXZlR2FtZVJlc3BvbnNlMkIKCEdhbWVTeW5jEjYKBFBsYXkSFC5nYW1lLnYxLlN0cmVhbUZyYW1lGhQuZ2FtZS52MS5TdHJlYW1GcmFtZSgBMAFCAlABYgZwcm90bzM',
+    'CgpnYW1lLnByb3RvEgdnYW1lLnYxIq4BCgtTdHJlYW1GcmFtZRIjCgZzdHJlYW0YASABKA4yEy5nYW1lLnYxLlN0cmVhbUtpbmQSCwoDc2VxGAIgASgEEg8KB3RpbWVfbXMYAyABKAMSKQoGY2xpZW50GAogASgLMhcuZ2FtZS52MS5DbGllbnRFbnZlbG9wZUgAEikKBnNlcnZlchgLIAEoCzIXLmdhbWUudjEuU2VydmVyRW52ZWxvcGVIAEIGCgRib2R5IogBCgtQdXp6bGVTZXR1cBIRCglpbWFnZV91cmwYASABKAkSEwoLaW1hZ2Vfd2lkdGgYAiABKA0SFAoMaW1hZ2VfaGVpZ2h0GAMgASgNEhMKC3BpZWNlX2NvdW50GAQgASgNEgwKBHNlZWQYBSABKA0SGAoQcm90YXRpb25fZW5hYmxlZBgGIAEoCCKCAQoRQ3JlYXRlR2FtZVJlcXVlc3QSDwoHZ2FtZV9pZBgBIAEoCRIZChFjcmVhdG9yX3BsYXllcl9pZBgCIAEoCRIcChRjcmVhdG9yX2Rpc3BsYXlfbmFtZRgDIAEoCRIjCgVzZXR1cBgEIAEoCzIULmdhbWUudjEuUHV6emxlU2V0dXAilAEKEkNyZWF0ZUdhbWVSZXNwb25zZRIPCgdnYW1lX2lkGAEgASgJEiMKBXNldHVwGAIgASgLMhQuZ2FtZS52MS5QdXp6bGVTZXR1cBIVCg1jcmVhdGVkX2F0X21zGAMgASgDEhUKDWV4cGlyZXNfYXRfbXMYBCABKAMSDAoEY29scxgFIAEoDRIMCgRyb3dzGAYgASgNIiEKDkdldEdhbWVSZXF1ZXN0Eg8KB2dhbWVfaWQYASABKAkivQEKD0dldEdhbWVSZXNwb25zZRIPCgdnYW1lX2lkGAEgASgJEiMKBXNldHVwGAIgASgLMhQuZ2FtZS52MS5QdXp6bGVTZXR1cBIVCg1jcmVhdGVkX2F0X21zGAMgASgDEhUKDWV4cGlyZXNfYXRfbXMYBCABKAMSDAoEY29scxgFIAEoDRIMCgRyb3dzGAYgASgNEhkKEWNyZWF0b3JfcGxheWVyX2lkGAcgASgJEg8KB2V4cGlyZWQYCCABKAgihgEKD0pvaW5HYW1lUmVxdWVzdBIPCgdnYW1lX2lkGAEgASgJEhEKCXBsYXllcl9pZBgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSOQoTcHJlZmVycmVkX3RyYW5zcG9ydBgEIAEoDjIcLmdhbWUudjEuVHJhbnNwb3J0UHJlZmVyZW5jZSLPAgoQSm9pbkdhbWVSZXNwb25zZRIPCgdnYW1lX2lkGAEgASgJEhEKCXBsYXllcl9pZBgCIAEoCRIjCgVzZXR1cBgDIAEoCzIULmdhbWUudjEuUHV6emxlU2V0dXASDAoEY29scxgEIAEoDRIMCgRyb3dzGAUgASgNEhYKDnNlcnZlcl90aW1lX21zGAYgASgDEhUKDWV4cGlyZXNfYXRfbXMYByABKAMSJQoFYm9hcmQYCCABKAsyFi5nYW1lLnYxLkJvYXJkU25hcHNob3QSJAoHcGxheWVycxgJIAMoCzITLmdhbWUudjEuUGxheWVySW5mbxIkCgRwbGF5GAogASgLMhYuZ2FtZS52MS5QbGF5RW5kcG9pbnRzEjQKFG5lZ290aWF0ZWRfdHJhbnNwb3J0GAsgASgOMhYuZ2FtZS52MS5UcmFuc3BvcnRLaW5kIkIKDVBsYXlFbmRwb2ludHMSGQoRd2VidHJhbnNwb3J0X3BhdGgYASABKAkSFgoOd2Vic29ja2V0X3BhdGgYAiABKAkiNgoQTGVhdmVHYW1lUmVxdWVzdBIPCgdnYW1lX2lkGAEgASgJEhEKCXBsYXllcl9pZBgCIAEoCSITChFMZWF2ZUdhbWVSZXNwb25zZSJFCgpQbGF5ZXJJbmZvEhEKCXBsYXllcl9pZBgBIAEoCRIUCgxkaXNwbGF5X25hbWUYAiABKAkSDgoGb25saW5lGAMgASgIImwKClBpZWNlU3RhdGUSEwoLcGllY2VfaW5kZXgYASABKA0SCwoDeF9xGAIgASgFEgsKA3lfcRgDIAEoBRIQCghncm91cF9pZBgEIAEoDRILCgNyZXYYBSABKA0SEAoIcm90YXRpb24YBiABKA0iRwoNQm9hcmRTbmFwc2hvdBIRCglib2FyZF9yZXYYASABKAQSIwoGcGllY2VzGAIgAygLMhMuZ2FtZS52MS5QaWVjZVN0YXRlInwKCUhlbGRHcm91cBIRCglwbGF5ZXJfaWQYASABKAkSGgoSYW5jaG9yX3BpZWNlX2luZGV4GAIgASgNEhAKCGdyb3VwX2lkGAMgASgNEhwKFG1lbWJlcl9waWVjZV9pbmRpY2VzGAQgAygNEhAKCHJvdGF0aW9uGAUgASgNIrcBCgxNb3Rpb25TYW1wbGUSDAoEaGlkZRgBIAEoCBIOCgZhbmNob3IYAiABKAgSEAoIYWJzb2x1dGUYAyABKAgSCwoDeF9xGAQgASgFEgsKA3lfcRgFIAEoBRINCgVkdF9tcxgGIAEoDRIMCgR2eF9xGAcgASgFEgwKBHZ5X3EYCCABKAUSDAoEYXhfcRgJIAEoBRIMCgRheV9xGAogASgFEhYKDmNsaWVudF90aW1lX21zGAsgASgNIvUDCg5DbGllbnRFbnZlbG9wZRIPCgdnYW1lX2lkGAEgASgJEhEKCXBsYXllcl9pZBgCIAEoCRILCgNzZXEYAyABKAQSFgoOY2xpZW50X3RpbWVfbXMYBCABKAMSJwoJaGVhcnRiZWF0GAogASgLMhIuZ2FtZS52MS5IZWFydGJlYXRIABInCgZjdXJzb3IYCyABKAsyFS5nYW1lLnYxLkN1cnNvclVwZGF0ZUgAEiYKBWNsYWltGAwgASgLMhUuZ2FtZS52MS5DbGFpbUNvbnRyb2xIABIqCgdyZWxlYXNlGA0gASgLMhcuZ2FtZS52MS5SZWxlYXNlQ29udHJvbEgAEiYKCW1vdmVfaGVsZBgOIAEoCzIRLmdhbWUudjEuTW92ZUhlbGRIABIlCgVtZXJnZRgPIAEoCzIULmdhbWUudjEuTWVyZ2VHcm91cHNIABInCgZyZW5hbWUYECABKAsyFS5nYW1lLnYxLlJlbmFtZVBsYXllckgAEigKBnJlc3luYxgRIAEoCzIWLmdhbWUudjEuUmVzeW5jUmVxdWVzdEgAEiMKBHBhY2UYEiABKAsyEy5nYW1lLnYxLlN0cmVhbVBhY2VIABIlCgZyb3RhdGUYEyABKAsyEy5nYW1lLnYxLlJvdGF0ZUhlbGRIAEIGCgRib2R5Ij0KDVJlc3luY1JlcXVlc3QSFAoMbGFzdF90aWNrX2lkGAEgASgEEhYKDmxhc3RfYm9hcmRfcmV2GAIgASgEIikKClN0cmVhbVBhY2USGwoTYnVmZmVyZWRfdGlja19jb3VudBgBIAEoDSIaCglIZWFydGJlYXQSDQoFbm9uY2UYASABKAkiNQoMQ3Vyc29yVXBkYXRlEiUKBm1vdGlvbhgBIAEoCzIVLmdhbWUudjEuTW90aW9uU2FtcGxlIloKDENsYWltQ29udHJvbBIVCg1waWVjZV9pbmRpY2VzGAEgAygNEhoKEmFuY2hvcl9waWVjZV9pbmRleBgCIAEoDRIXCg9jbGllbnRfY2xhaW1faWQYAyABKAQiUQoOUmVsZWFzZUNvbnRyb2wSFQoNcGllY2VfaW5kaWNlcxgBIAMoDRIoCgtmaW5hbF9wb3NlcxgCIAMoCzITLmdhbWUudjEuUGllY2VTdGF0ZSJ9CghNb3ZlSGVsZBIaChJhbmNob3JfcGllY2VfaW5kZXgYASABKA0SEAoIZ3JvdXBfaWQYAiABKA0SHAoUbWVtYmVyX3BpZWNlX2luZGljZXMYAyADKA0SJQoGbW90aW9uGAQgASgLMhUuZ2FtZS52MS5Nb3Rpb25TYW1wbGUizAEKC01lcmdlR3JvdXBzEhcKD21vdmluZ19ncm91cF9pZBgBIAEoDRIXCg90YXJnZXRfZ3JvdXBfaWQYAiABKA0SHQoVbW92aW5nX21lbWJlcl9pbmRpY2VzGAMgAygNEh0KFXRhcmdldF9tZW1iZXJfaW5kaWNlcxgEIAMoDRIZChFtb3ZpbmdfYW5jaG9yX3hfcRgFIAEoBRIZChFtb3ZpbmdfYW5jaG9yX3lfcRgGIAEoBRIXCg9jbGllbnRfbWVyZ2VfaWQYByABKAQiUQoKUm90YXRlSGVsZBIaChJhbmNob3JfcGllY2VfaW5kZXgYASABKA0SEAoIZ3JvdXBfaWQYAiABKA0SFQoNcXVhcnRlcl90dXJucxgDIAEoDSIkCgxSZW5hbWVQbGF5ZXISFAoMZGlzcGxheV9uYW1lGAEgASgJIvUCCg5TZXJ2ZXJFbnZlbG9wZRIPCgdnYW1lX2lkGAEgASgJEgsKA3NlcRgCIAEoBBIWCg5zZXJ2ZXJfdGltZV9tcxgDIAEoAxIjCgd3ZWxjb21lGAogASgLMhAuZ2FtZS52MS5XZWxjb21lSAASHQoEdGljaxgLIAEoCzINLmdhbWUudjEuVGlja0gAEiwKDGNsYWltX3Jlc3VsdBgMIAEoCzIULmdhbWUudjEuQ2xhaW1SZXN1bHRIABIsCgxtZXJnZV9yZXN1bHQYDSABKAsyFC5nYW1lLnYxLk1lcmdlUmVzdWx0SAASKwoIcHJlc2VuY2UYDiABKAsyFy5nYW1lLnYxLlByZXNlbmNlVXBkYXRlSAASKAoKZ2FtZV9ldmVudBgPIAEoCzISLmdhbWUudjEuR2FtZUV2ZW50SAASLgoNaGVhcnRiZWF0X2FjaxgQIAEoCzIVLmdhbWUudjEuSGVhcnRiZWF0QWNrSABCBgoEYm9keSKEAgoHV2VsY29tZRIRCglwbGF5ZXJfaWQYASABKAkSJQoFYm9hcmQYAiABKAsyFi5nYW1lLnYxLkJvYXJkU25hcHNob3QSJAoHcGxheWVycxgDIAMoCzITLmdhbWUudjEuUGxheWVySW5mbxIkCghob2xkaW5ncxgEIAMoCzISLmdhbWUudjEuSGVsZEdyb3VwEg8KB3RpY2tfaHoYBSABKA0SHAoUaGVhcnRiZWF0X3RpbWVvdXRfbXMYBiABKA0SGQoRZHVhbF9iaWRpX3N0cmVhbXMYByABKAgSKQoJdHJhbnNwb3J0GAggASgOMhYuZ2FtZS52MS5UcmFuc3BvcnRLaW5kIrEBCgRUaWNrEg8KB3RpY2tfaWQYASABKAQSEQoJYm9hcmRfcmV2GAIgASgEEiQKB3BsYXllcnMYAyADKAsyEy5nYW1lLnYxLlBsYXllclBvc2USKQoMcGllY2VfZGVsdGFzGAQgAygLMhMuZ2FtZS52MS5QaWVjZVN0YXRlEiQKCGhvbGRpbmdzGAUgAygLMhIuZ2FtZS52MS5IZWxkR3JvdXASDgoGcmVzeW5jGAYgASgIIsABCgpQbGF5ZXJQb3NlEhEKCXBsYXllcl9pZBgBIAEoCRIlCgZjdXJzb3IYAiABKAsyFS5nYW1lLnYxLk1vdGlvblNhbXBsZRIjCgRoZWxkGAMgASgLMhUuZ2FtZS52MS5Nb3Rpb25TYW1wbGUSHwoXaGVsZF9hbmNob3JfcGllY2VfaW5kZXgYBCABKA0SFQoNaGVsZF9ncm91cF9pZBgFIAEoDRIbChNoZWxkX21lbWJlcl9pbmRpY2VzGAYgAygNIo8BCgtDbGFpbVJlc3VsdBIXCg9jbGllbnRfY2xhaW1faWQYASABKAQSEAoIYWNjZXB0ZWQYAiABKAgSHQoVZ3JhbnRlZF9waWVjZV9pbmRpY2VzGAMgAygNEhwKFGRlbmllZF9waWVjZV9pbmRpY2VzGAQgAygNEhgKEGhvbGRlcl9wbGF5ZXJfaWQYBSABKAkisAEKC01lcmdlUmVzdWx0EhcKD2NsaWVudF9tZXJnZV9pZBgBIAEoBBIQCghhY2NlcHRlZBgCIAEoCBIaChJyZXN1bHRpbmdfZ3JvdXBfaWQYAyABKA0SHAoUbWVtYmVyX3BpZWNlX2luZGljZXMYBCADKA0SJQoFYm9hcmQYBSABKAsyFi5nYW1lLnYxLkJvYXJkU25hcHNob3QSFQoNcmVqZWN0X3JlYXNvbhgGIAEoCSJSCg5QcmVzZW5jZVVwZGF0ZRIkCgdwbGF5ZXJzGAEgAygLMhMuZ2FtZS52MS5QbGF5ZXJJbmZvEhoKEnJlbW92ZWRfcGxheWVyX2lkcxgCIAMoCSKHAgoJR2FtZUV2ZW50EiUKBGtpbmQYASABKA4yFy5nYW1lLnYxLkdhbWVFdmVudC5LaW5kEg8KB21lc3NhZ2UYAiABKAkSHgoWcmVsZWFzZWRfcGllY2VfaW5kaWNlcxgDIAMoDRIlCgVib2FyZBgEIAEoCzIWLmdhbWUudjEuQm9hcmRTbmFwc2hvdCJ7CgRLaW5kEhQKEEtJTkRfVU5TUEVDSUZJRUQQABIVChFLSU5EX0dBTUVfRVhQSVJFRBABEhQKEEtJTkRfUk9PTV9DTE9TRUQQAhIWChJLSU5EX0ZPUkNFX1JFTEVBU0UQAxIYChRLSU5EX1JFU1lOQ19SRVFVSVJFRBAEIjUKDEhlYXJ0YmVhdEFjaxINCgVub25jZRgBIAEoCRIWCg5zZXJ2ZXJfdGltZV9tcxgCIAEoAypXCgpTdHJlYW1LaW5kEhsKF1NUUkVBTV9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRU1RSRUFNX0tJTkRfSU5QVVQQARIVChFTVFJFQU1fS0lORF9XT1JMRBACKqUBChNUcmFuc3BvcnRQcmVmZXJlbmNlEiQKIFRSQU5TUE9SVF9QUkVGRVJFTkNFX1VOU1BFQ0lGSUVEEAASJQohVFJBTlNQT1JUX1BSRUZFUkVOQ0VfV0VCVFJBTlNQT1JUEAESIgoeVFJBTlNQT1JUX1BSRUZFUkVOQ0VfV0VCU09DS0VUEAISHQoZVFJBTlNQT1JUX1BSRUZFUkVOQ0VfQVVUTxADKm4KDVRyYW5zcG9ydEtpbmQSHgoaVFJBTlNQT1JUX0tJTkRfVU5TUEVDSUZJRUQQABIfChtUUkFOU1BPUlRfS0lORF9XRUJUUkFOU1BPUlQQARIcChhUUkFOU1BPUlRfS0lORF9XRUJTT0NLRVQQAjKXAgoLR2FtZVNlc3Npb24SRQoKQ3JlYXRlR2FtZRIaLmdhbWUudjEuQ3JlYXRlR2FtZVJlcXVlc3QaGy5nYW1lLnYxLkNyZWF0ZUdhbWVSZXNwb25zZRI8CgdHZXRHYW1lEhcuZ2FtZS52MS5HZXRHYW1lUmVxdWVzdBoYLmdhbWUudjEuR2V0R2FtZVJlc3BvbnNlEj8KCEpvaW5HYW1lEhguZ2FtZS52MS5Kb2luR2FtZVJlcXVlc3QaGS5nYW1lLnYxLkpvaW5HYW1lUmVzcG9uc2USQgoJTGVhdmVHYW1lEhkuZ2FtZS52MS5MZWF2ZUdhbWVSZXF1ZXN0GhouZ2FtZS52MS5MZWF2ZUdhbWVSZXNwb25zZTJCCghHYW1lU3luYxI2CgRQbGF5EhQuZ2FtZS52MS5TdHJlYW1GcmFtZRoULmdhbWUudjEuU3RyZWFtRnJhbWUoATABQgJQAWIGcHJvdG8z',
   )
 
 /**
@@ -105,6 +105,16 @@ export type PuzzleSetup = Message<'game.v1.PuzzleSetup'> & {
    * @generated from field: uint32 seed = 5;
    */
   seed: number
+
+  /**
+   * Rotation mode. True: the server deals every piece a random orientation
+   * (PieceState.rotation) and accepts RotateHeld. False (the default, and every
+   * game created before this field existed): all pieces stay at rotation 0 and
+   * RotateHeld is ignored.
+   *
+   * @generated from field: bool rotation_enabled = 6;
+   */
+  rotationEnabled: boolean
 }
 
 /**
@@ -351,7 +361,8 @@ export type JoinGameResponse = Message<'game.v1.JoinGameResponse'> & {
   players: PlayerInfo[]
 
   /**
-   * Where to open the UDP (WebTransport) play streams; WS is fallback only.
+   * Relative play paths (see PlayEndpoints). Client resolves against its
+   * configured WebTransport / WebSocket bases.
    *
    * @generated from field: game.v1.PlayEndpoints play = 10;
    */
@@ -374,7 +385,19 @@ export const JoinGameResponseSchema: GenMessage<JoinGameResponse> =
 /**
  * Play dial targets after JoinGame.
  *
- * Client owns scheme/host/port; these fields are path + query only.
+ * Contract:
+ *   - Client knows absolute bases (scheme + host + port), e.g. from
+ *     VITE_GAME_WEBTRANSPORT_URL / VITE_GAME_WEBSOCKET_URL.
+ *   - Server returns path-absolute relative references only: must start with
+ *     `/`, may include `?query`. Example: `/game?game_id=…&player_id=…`.
+ *   - Server MAY change the path across versions or redirects
+ *     (`/game` → `/use-this-new-path`), still on the client's configured host.
+ *   - Server MUST NOT return another hostname or port. Absolute URLs with a
+ *     host are a protocol error; compliant clients ignore host/port and keep
+ *     only `path + query` when migrating old servers.
+ *
+ * Best case is always WebTransport (QUIC/UDP) when the client can dial it;
+ * WebSocket is the fallback pipe on the client's WS base.
  *
  * @generated from message game.v1.PlayEndpoints
  */
@@ -496,6 +519,13 @@ export type PieceState = Message<'game.v1.PieceState'> & {
    * @generated from field: uint32 rev = 5;
    */
   rev: number
+
+  /**
+   * Clockwise quarter turns, 0..3. Absent ⇒ 0.
+   *
+   * @generated from field: uint32 rotation = 6;
+   */
+  rotation: number
 }
 
 /**
@@ -552,6 +582,13 @@ export type HeldGroup = Message<'game.v1.HeldGroup'> & {
    * @generated from field: repeated uint32 member_piece_indices = 4;
    */
   memberPieceIndices: number[]
+
+  /**
+   * Current rotation of the held group (changes on RotateHeld).
+   *
+   * @generated from field: uint32 rotation = 5;
+   */
+  rotation: number
 }
 
 /**
@@ -563,7 +600,22 @@ export const HeldGroupSchema: GenMessage<HeldGroup> =
   messageDesc(file_game, 14)
 
 /**
- * Mirrors src/puzzle/kinematics.ts MotionPacket after encodeMotion.
+ * Shared knot for CursorUpdate / MoveHeld (client→server) and Tick poses
+ * (server→client). Same units as src/puzzle/kinematics.ts MotionPacket:
+ * x_q/y_q/v*\/a* are MOTION_Q quanta (px * 32), never raw pixels.
+ *
+ * absolute:
+ *   true  → x_q/y_q are world-table coordinates.
+ *   false → x_q/y_q are deltas from the sender's previous knot for this
+ *           trajectory (cursor or held). The receiver MUST add them to its
+ *           last resolved pose. A relative sample with no prior basis is
+ *           ignored (same as the browser MotionTrack).
+ * anchor=true implies a required exact pose (and is treated as absolute).
+ * hide=true clears / conceals that trajectory; it is NOT a world pose at 0,0.
+ *
+ * Client→server may mix absolute and relative knots (bandwidth). Server
+ * trajectory repair must honor `absolute`. Server→client Tick cursor/held
+ * samples are always absolute=true after repair.
  *
  * @generated from message game.v1.MotionSample
  */
@@ -729,6 +781,13 @@ export type ClientEnvelope = Message<'game.v1.ClientEnvelope'> & {
         value: StreamPace
         case: 'pace'
       }
+    | {
+        /**
+         * @generated from field: game.v1.RotateHeld rotate = 19;
+         */
+        value: RotateHeld
+        case: 'rotate'
+      }
     | { case: undefined; value?: undefined }
 }
 
@@ -867,7 +926,9 @@ export type ReleaseControl = Message<'game.v1.ReleaseControl'> & {
   pieceIndices: number[]
 
   /**
-   * Final resting pose for released pieces (authoritative commit).
+   * Final resting pose for released pieces (authoritative commit). Only
+   * x_q/y_q are committed; `rotation` is ignored here and changes only through
+   * RotateHeld.
    *
    * @generated from field: repeated game.v1.PieceState final_poses = 2;
    */
@@ -919,7 +980,13 @@ export const MoveHeldSchema: GenMessage<MoveHeld> =
 
 /**
  * Join one held group (or free group) onto another. Server validates geometry
- * / ownership and either applies or rejects.
+ * / ownership and either applies or rejects. Both groups must have the same
+ * rotation (reject_reason "rotation mismatch"); the neighbour gap is measured
+ * at the turned offset (see PieceState). A rejected merge leaves the board
+ * untouched. After an accepted merge the sender holds the resulting group and
+ * that hold keeps its anchor piece.
+ * Client snap adopts target_group_id as the surviving local group id for every
+ * member of both sides (moving pieces are retagged; target id is unchanged).
  *
  * @generated from message game.v1.MergeGroups
  */
@@ -947,7 +1014,8 @@ export type MergeGroups = Message<'game.v1.MergeGroups'> & {
   targetMemberIndices: number[]
 
   /**
-   * Pose of moving group at merge attempt (anchor quantized).
+   * Pose of the sender's held anchor piece (HeldGroup.anchor_piece_index) at
+   * the merge attempt, quantized.
    *
    * @generated from field: int32 moving_anchor_x_q = 5;
    */
@@ -973,6 +1041,53 @@ export const MergeGroupsSchema: GenMessage<MergeGroups> =
   messageDesc(file_game, 24)
 
 /**
+ * Turn a group the sender holds by clockwise quarter turns about one of its
+ * pieces: the pivot keeps its x_q/y_q, every other member moves to
+ * pivot + R^turns(member - pivot), and every member's rotation becomes
+ * (rotation + turns) mod 4. On quantized poses this is exact, so four turns
+ * restore every position. Ignored unless the game has
+ * PuzzleSetup.rotation_enabled and the sender holds the group. No reply: the
+ * new orientation shows in Tick.holdings[].rotation and, once released, in
+ * PieceState.rotation.
+ *
+ * @generated from message game.v1.RotateHeld
+ */
+export type RotateHeld = Message<'game.v1.RotateHeld'> & {
+  /**
+   * Pivot piece; becomes the hold's anchor, as in MoveHeld. The group turned
+   * is the one this piece belongs to on the server's board, when the sender
+   * holds it.
+   *
+   * @generated from field: uint32 anchor_piece_index = 1;
+   */
+  anchorPieceIndex: number
+
+  /**
+   * Advisory, like MoveHeld.group_id: the client's id for a group can lag the
+   * server's after a merge. Used only when anchor_piece_index does not name a
+   * piece the sender holds; the pivot is then that hold's anchor.
+   *
+   * @generated from field: uint32 group_id = 2;
+   */
+  groupId: number
+
+  /**
+   * Clockwise quarter turns, taken mod 4 (3 = one counter-clockwise turn).
+   *
+   * @generated from field: uint32 quarter_turns = 3;
+   */
+  quarterTurns: number
+}
+
+/**
+ * Describes the message game.v1.RotateHeld.
+ * Use `create(RotateHeldSchema)` to create a new message.
+ */
+export const RotateHeldSchema: GenMessage<RotateHeld> =
+  /*@__PURE__*/
+  messageDesc(file_game, 25)
+
+/**
  * @generated from message game.v1.RenamePlayer
  */
 export type RenamePlayer = Message<'game.v1.RenamePlayer'> & {
@@ -988,7 +1103,7 @@ export type RenamePlayer = Message<'game.v1.RenamePlayer'> & {
  */
 export const RenamePlayerSchema: GenMessage<RenamePlayer> =
   /*@__PURE__*/
-  messageDesc(file_game, 25)
+  messageDesc(file_game, 26)
 
 /**
  * @generated from message game.v1.ServerEnvelope
@@ -1071,7 +1186,7 @@ export type ServerEnvelope = Message<'game.v1.ServerEnvelope'> & {
  */
 export const ServerEnvelopeSchema: GenMessage<ServerEnvelope> =
   /*@__PURE__*/
-  messageDesc(file_game, 26)
+  messageDesc(file_game, 27)
 
 /**
  * @generated from message game.v1.Welcome
@@ -1126,7 +1241,7 @@ export type Welcome = Message<'game.v1.Welcome'> & {
  */
 export const WelcomeSchema: GenMessage<Welcome> =
   /*@__PURE__*/
-  messageDesc(file_game, 27)
+  messageDesc(file_game, 28)
 
 /**
  * Fixed-rate (~10 Hz) consolidated world view after conflict resolution and
@@ -1151,13 +1266,18 @@ export type Tick = Message<'game.v1.Tick'> & {
   players: PlayerPose[]
 
   /**
-   * Only pieces that changed since last tick (or full set when resync=true).
+   * Resting board only. Held pieces are omitted from non-resync deltas (and
+   * still appear at last committed board pose on resync); live drag pose is
+   * PlayerPose.held + holdings, not piece_deltas.
    *
    * @generated from field: repeated game.v1.PieceState piece_deltas = 4;
    */
   pieceDeltas: PieceState[]
 
   /**
+   * Authoritative who-holds-what. Membership can be sparse on PlayerPose;
+   * clients retain the last member list while the player remains in holdings.
+   *
    * @generated from field: repeated game.v1.HeldGroup holdings = 5;
    */
   holdings: HeldGroup[]
@@ -1174,7 +1294,7 @@ export type Tick = Message<'game.v1.Tick'> & {
  */
 export const TickSchema: GenMessage<Tick> =
   /*@__PURE__*/
-  messageDesc(file_game, 28)
+  messageDesc(file_game, 29)
 
 /**
  * @generated from message game.v1.PlayerPose
@@ -1193,7 +1313,11 @@ export type PlayerPose = Message<'game.v1.PlayerPose'> & {
   cursor?: MotionSample | undefined
 
   /**
-   * Server-smoothed held-group anchor pose when holding.
+   * Server-smoothed held-group anchor. Always absolute when present as a pose.
+   * hide=true means "no motion sample yet / not drawing held motion" — it does
+   * NOT clear the hold. While the player appears in Tick.holdings, clients keep
+   * the previous held pose (or leave pieces on the resting board until the
+   * first non-hide sample). held_* index fields may still be populated.
    *
    * @generated from field: game.v1.MotionSample held = 3;
    */
@@ -1221,7 +1345,7 @@ export type PlayerPose = Message<'game.v1.PlayerPose'> & {
  */
 export const PlayerPoseSchema: GenMessage<PlayerPose> =
   /*@__PURE__*/
-  messageDesc(file_game, 29)
+  messageDesc(file_game, 30)
 
 /**
  * @generated from message game.v1.ClaimResult
@@ -1263,7 +1387,7 @@ export type ClaimResult = Message<'game.v1.ClaimResult'> & {
  */
 export const ClaimResultSchema: GenMessage<ClaimResult> =
   /*@__PURE__*/
-  messageDesc(file_game, 30)
+  messageDesc(file_game, 31)
 
 /**
  * @generated from message game.v1.MergeResult
@@ -1306,7 +1430,7 @@ export type MergeResult = Message<'game.v1.MergeResult'> & {
  */
 export const MergeResultSchema: GenMessage<MergeResult> =
   /*@__PURE__*/
-  messageDesc(file_game, 31)
+  messageDesc(file_game, 32)
 
 /**
  * @generated from message game.v1.PresenceUpdate
@@ -1331,7 +1455,7 @@ export type PresenceUpdate = Message<'game.v1.PresenceUpdate'> & {
  */
 export const PresenceUpdateSchema: GenMessage<PresenceUpdate> =
   /*@__PURE__*/
-  messageDesc(file_game, 32)
+  messageDesc(file_game, 33)
 
 /**
  * @generated from message game.v1.GameEvent
@@ -1364,7 +1488,7 @@ export type GameEvent = Message<'game.v1.GameEvent'> & {
  */
 export const GameEventSchema: GenMessage<GameEvent> =
   /*@__PURE__*/
-  messageDesc(file_game, 33)
+  messageDesc(file_game, 34)
 
 /**
  * @generated from enum game.v1.GameEvent.Kind
@@ -1407,7 +1531,7 @@ export type GameEvent_Kind =
  */
 export const GameEvent_KindSchema: GenEnum<GameEvent_Kind> =
   /*@__PURE__*/
-  enumDesc(file_game, 33, 0)
+  enumDesc(file_game, 34, 0)
 
 /**
  * @generated from message game.v1.HeartbeatAck
@@ -1430,7 +1554,7 @@ export type HeartbeatAck = Message<'game.v1.HeartbeatAck'> & {
  */
 export const HeartbeatAckSchema: GenMessage<HeartbeatAck> =
   /*@__PURE__*/
-  messageDesc(file_game, 34)
+  messageDesc(file_game, 35)
 
 /**
  * Which QUIC bidi stream a frame belongs on (best-case WebTransport).
@@ -1444,7 +1568,8 @@ export const StreamKind = {
   UNSPECIFIED: 0,
 
   /**
-   * Client→server: Heartbeat, CursorUpdate, Claim, Release, MoveHeld, Merge, Rename.
+   * Client→server: Heartbeat, CursorUpdate, Claim, Release, MoveHeld, Merge,
+   * Rename, RotateHeld.
    * Server→client: ClaimResult, MergeResult, HeartbeatAck, urgent GameEvent.
    *
    * @generated from enum value: STREAM_KIND_INPUT = 1;
