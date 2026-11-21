@@ -1,6 +1,7 @@
-import type { PieceState, Tick } from '../gen/game_pb.ts'
+import type { BoardSnapshot, PieceState, Tick } from '../gen/game_pb.ts'
 import { dequantize } from '../puzzle/kinematics.ts'
 import type { Placement } from '../puzzle/play.ts'
+import { normalizeTurns } from '../puzzle/rotation.ts'
 import { idFromIndex } from '../puzzle/world.ts'
 import type { BoardSnapshotJson, PieceStateJson } from './gameClient.ts'
 
@@ -19,8 +20,22 @@ export function boardJsonToPlacements(
       x: dequantize(state.xQ),
       y: dequantize(state.yQ),
       group: idFromIndex(state.groupId, cols),
+      rotation: normalizeTurns(state.rotation ?? 0),
     }
   })
+}
+
+/** Board snapshot from a play-stream message (Welcome, MergeResult, GameEvent). */
+export function boardToPlacements(
+  board: BoardSnapshot,
+  cols: number,
+  template: readonly Placement[],
+): Placement[] {
+  return boardJsonToPlacements(
+    { boardRev: Number(board.boardRev), pieces: board.pieces },
+    cols,
+    template,
+  )
 }
 
 export function applyPieceStates(
@@ -39,6 +54,7 @@ export function applyPieceStates(
     piece.x = dequantize(state.xQ)
     piece.y = dequantize(state.yQ)
     piece.group = idFromIndex(state.groupId, cols)
+    piece.rotation = normalizeTurns(state.rotation)
   }
   return next
 }
@@ -69,6 +85,7 @@ export function applyTickBoard(
         x: dequantize(state.xQ),
         y: dequantize(state.yQ),
         group: idFromIndex(state.groupId, cols),
+        rotation: normalizeTurns(state.rotation),
       }
     })
   }
@@ -101,6 +118,7 @@ export function placementsToFinalPoses(
       yQ: Math.round(piece.y * 32),
       groupId,
       rev: 0,
+      rotation: piece.rotation,
     })
   }
   return out

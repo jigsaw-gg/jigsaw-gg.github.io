@@ -14,6 +14,7 @@ import { event, setPlayTransport } from '../otel/index.ts'
 import { buildPuzzle } from '../puzzle/cut.ts'
 import { MotionSender } from '../puzzle/kinematics.ts'
 import { scatterPieces, type Placement } from '../puzzle/play.ts'
+import { normalizeTurns, turnVector } from '../puzzle/rotation.ts'
 import type { PuzzleSetup } from '../puzzle/session.ts'
 import {
   cursorColor,
@@ -24,6 +25,7 @@ import {
 import {
   applyTickBoard,
   boardJsonToPlacements,
+  boardToPlacements,
   placementsToFinalPoses,
 } from './applyTick.ts'
 import type { BoardSnapshotJson, PlayEndpoints } from './gameClient.ts'
@@ -39,6 +41,9 @@ export interface RemoteCursor {
   y: number
 }
 
+/** How long a released hold waits for its ClaimResult before ticks win. */
+const UNCONFIRMED_HOLD_MS = 2000
+
 interface LocalDrag {
   anchorId: string
   group: string
@@ -47,12 +52,15 @@ interface LocalDrag {
   sends: number
   claimId: bigint
   claimed: boolean
+  /** Resting poses of the members when the hold began, for a denied claim. */
+  before: Placement[]
 }
 
 interface SyncApi {
   reportPointer: (x: number, y: number) => void
   reportPointerGone: () => void
   reportDrag: (placements: Placement[], anchorId: string) => void
+  reportRotate: (anchorId: string, quarterTurns: number) => void
   reportDragEnd: (placements: Placement[]) => void
   reportDragCancel: () => void
 }
@@ -81,6 +89,12 @@ export function useGameWorld(
   reportPointer: (x: number, y: number) => void
   reportPointerGone: () => void
   reportDrag: (placements: Placement[], anchorId: string) => void
+  /**
+   * Report a quarter turn the board has already applied to its local
+   * placements. Call it between reportDrag (which claims the group) and
+   * reportDragEnd for the same hold. `anchorId` is the pivot piece.
+   */
+  reportRotate: (anchorId: string, quarterTurns: number) => void
   reportDragEnd: (placements: Placement[]) => void
   reportDragCancel: () => void
 } {
@@ -136,6 +150,8 @@ export function useGameWorld(
         /** Last tick target; display pose comes from remoteHeldSmoothRef. */
         x: number
         y: number
+        /** Orientation of the held group (HeldGroup.rotation). */
+        rotation: number
       }
     >(),
   )
@@ -149,6 +165,7 @@ export function useGameWorld(
     reportPointer: () => {},
     reportPointerGone: () => {},
     reportDrag: () => {},
+    reportRotate: () => {},
     reportDragEnd: () => {},
     reportDragCancel: () => {},
   })
@@ -194,6 +211,13 @@ export function useGameWorld(
     let frame = 0
     let closed = false
     let welcomeBoardApplied = false
+    // Holds released before their ClaimResult arrived, by claim id. Ticks
+    // sent before the server saw the claim still show the old poses, so
+    // these pieces are shielded from tick updates until the answer comes.
+    const unconfirmed = new Map<
+      bigint,
+      { before: Placement[]; releasedAt: number }
+    >()
     queueMicrotask(() => {
       if (closed) return
       setView(initial)
@@ -207,6 +231,14 @@ export function useGameWorld(
       }
       for (const held of remoteHeldRef.current.values()) {
         for (const id of held.members) ids.add(id)
+      }
+      const now = performance.now()
+      for (const [claimId, pending] of unconfirmed) {
+        if (now - pending.releasedAt > UNCONFIRMED_HOLD_MS) {
+          unconfirmed.delete(claimId)
+          continue
+        }
+        for (const piece of pending.before) ids.add(piece.id)
       }
       return ids
     }
@@ -223,17 +255,8 @@ export function useGameWorld(
       if (welcome.board && builtRef.current && !welcomeBoardApplied) {
         welcomeBoardApplied = true
         applyBoard(
-          boardJsonToPlacements(
-            {
-              boardRev: Number(welcome.board.boardRev),
-              pieces: welcome.board.pieces.map((p) => ({
-                pieceIndex: p.pieceIndex,
-                xQ: p.xQ,
-                yQ: p.yQ,
-                groupId: p.groupId,
-                rev: p.rev,
-              })),
-            },
+          boardToPlacements(
+            welcome.board,
             builtRef.current.cols,
             builtRef.current.template,
           ),
@@ -302,6 +325,7 @@ export function useGameWorld(
           members: string[]
           x: number
           y: number
+          rotation: number
         }
       >()
       for (const playerId of heldCandidates) {
@@ -350,6 +374,9 @@ export function useGameWorld(
           members,
           x,
           y,
+          rotation: holding
+            ? normalizeTurns(holding.rotation)
+            : (prev?.rotation ?? current[anchorIndex]?.rotation ?? 0),
         })
         if (pose?.held && !pose.held.hide) {
           let smooth = remoteHeldSmoothRef.current.get(playerId)
@@ -375,7 +402,26 @@ export function useGameWorld(
 
     const onClaimResult = (result: ClaimResult) => {
       const held = localDragRef.current
-      if (!held || held.claimId !== result.clientClaimId) return
+      if (!held || held.claimId !== result.clientClaimId) {
+        // The hold ended before this answer came (a quick turn or drag). A
+        // denied claim means the server kept none of it: put the pieces back.
+        const before = unconfirmed.get(result.clientClaimId)?.before
+        unconfirmed.delete(result.clientClaimId)
+        const resting = restingRef.current
+        if (
+          before &&
+          resting &&
+          (!result.accepted || result.grantedPieceIndices.length === 0)
+        ) {
+          event('piece-logic', 'game.claim.denied_after_release', {
+            'jigsaw.game.id': sessionId,
+            clientClaimId: Number(result.clientClaimId),
+          })
+          const prior = new Map(before.map((piece) => [piece.id, piece]))
+          applyBoard(resting.map((piece) => prior.get(piece.id) ?? piece))
+        }
+        return
+      }
       if (!result.accepted || result.grantedPieceIndices.length === 0) {
         event('piece-logic', 'game.claim.denied_local', {
           'jigsaw.game.id': sessionId,
@@ -404,17 +450,8 @@ export function useGameWorld(
       // before the server's next grouped delta arrives.
       if (result.board && builtRef.current) {
         applyBoard(
-          boardJsonToPlacements(
-            {
-              boardRev: Number(result.board.boardRev),
-              pieces: result.board.pieces.map((p) => ({
-                pieceIndex: p.pieceIndex,
-                xQ: p.xQ,
-                yQ: p.yQ,
-                groupId: p.groupId,
-                rev: p.rev,
-              })),
-            },
+          boardToPlacements(
+            result.board,
             builtRef.current.cols,
             builtRef.current.template,
           ),
@@ -443,17 +480,8 @@ export function useGameWorld(
       }
       if (gameEvent.board && builtRef.current) {
         applyBoard(
-          boardJsonToPlacements(
-            {
-              boardRev: Number(gameEvent.board.boardRev),
-              pieces: gameEvent.board.pieces.map((p) => ({
-                pieceIndex: p.pieceIndex,
-                xQ: p.xQ,
-                yQ: p.yQ,
-                groupId: p.groupId,
-                rev: p.rev,
-              })),
-            },
+          boardToPlacements(
+            gameEvent.board,
             builtRef.current.cols,
             builtRef.current.template,
           ),
@@ -643,6 +671,7 @@ export function useGameWorld(
             .filter((v): v is number => v !== null)
           const anchorIndex = pieceIndex(anchorId, geo.cols, geo.rows)
           if (anchorIndex === null || indices.length === 0) return
+          const memberSet = new Set(members)
           held = {
             anchorId,
             group: anchor.group,
@@ -651,6 +680,9 @@ export function useGameWorld(
             sends: 0,
             claimId,
             claimed: false,
+            before: (restingRef.current ?? [])
+              .filter((piece) => memberSet.has(piece.id))
+              .map((piece) => ({ ...piece })),
           }
           localDragRef.current = held
           session.sendClaim(indices, anchorIndex, claimId)
@@ -705,6 +737,22 @@ export function useGameWorld(
           })
         }, 70)
       },
+      reportRotate(anchorId, quarterTurns) {
+        const held = localDragRef.current
+        const geo = builtRef.current
+        const turns = normalizeTurns(quarterTurns)
+        if (!held || !geo || turns === 0) return
+        if (!held.members.includes(anchorId)) return
+        const anchorIndex = pieceIndex(anchorId, geo.cols, geo.rows)
+        const groupId = pieceIndex(held.group, geo.cols, geo.rows)
+        if (anchorIndex === null || groupId === null) return
+        // The pivot keeps its pose, so the MoveHeld stream needs no reset.
+        session.sendRotate({
+          anchorPieceIndex: anchorIndex,
+          groupId,
+          quarterTurns: turns,
+        })
+      },
       reportDragEnd(placements) {
         const held = localDragRef.current
         const geo = builtRef.current
@@ -731,6 +779,12 @@ export function useGameWorld(
             held.members,
           )
           session.sendRelease(poses)
+          if (!held.claimed) {
+            unconfirmed.set(held.claimId, {
+              before: held.before,
+              releasedAt: performance.now(),
+            })
+          }
         }
         localDragRef.current = null
         dragSender.reset()
@@ -802,14 +856,20 @@ export function useGameWorld(
         if (!anchor) continue
         const smooth = remoteHeldSmoothRef.current.get(playerId)
         const pose = smooth?.step(dtSec, now) ?? { x: held.x, y: held.y }
-        const dx = pose.x - anchor.x
-        const dy = pose.y - anchor.y
+        // The resting copy keeps the orientation the group had when it was
+        // picked up; swing each member around the anchor by the difference.
+        const turns = normalizeTurns(held.rotation - anchor.rotation)
         const memberSet = new Set(held.members)
-        composed = composed.map((piece) =>
-          memberSet.has(piece.id)
-            ? { ...piece, x: piece.x + dx, y: piece.y + dy }
-            : piece,
-        )
+        composed = composed.map((piece) => {
+          if (!memberSet.has(piece.id)) return piece
+          const arm = turnVector(piece.x - anchor.x, piece.y - anchor.y, turns)
+          return {
+            ...piece,
+            x: pose.x + arm.x,
+            y: pose.y + arm.y,
+            rotation: held.rotation,
+          }
+        })
       }
       const local = localDragRef.current
       if (local?.claimed) raised.push(local.group)
@@ -839,6 +899,7 @@ export function useGameWorld(
         reportPointer: () => {},
         reportPointerGone: () => {},
         reportDrag: () => {},
+        reportRotate: () => {},
         reportDragEnd: () => {},
         reportDragCancel: () => {},
       }
@@ -857,6 +918,9 @@ export function useGameWorld(
     },
     [],
   )
+  const reportRotate = useCallback((anchorId: string, quarterTurns: number) => {
+    api.current.reportRotate(anchorId, quarterTurns)
+  }, [])
   const reportDragEnd = useCallback((placements: Placement[]) => {
     api.current.reportDragEnd(placements)
   }, [])
@@ -875,6 +939,7 @@ export function useGameWorld(
     reportPointer,
     reportPointerGone,
     reportDrag,
+    reportRotate,
     reportDragEnd,
     reportDragCancel,
   }
@@ -912,7 +977,7 @@ function boardsEqual(
     const a = left[i]
     const b = right[i]
     if (!a || !b) return false
-    if (a.group !== b.group) return false
+    if (a.group !== b.group || a.rotation !== b.rotation) return false
     if (Math.abs(a.x - b.x) > 0.05 || Math.abs(a.y - b.y) > 0.05) return false
   }
   return true

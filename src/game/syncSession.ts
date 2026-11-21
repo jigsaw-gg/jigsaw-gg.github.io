@@ -8,6 +8,7 @@ import {
   MoveHeldSchema,
   PieceStateSchema,
   ReleaseControlSchema,
+  RotateHeldSchema,
   StreamFrameSchema,
   StreamKind,
   type ClaimResult,
@@ -184,8 +185,37 @@ export class GameSyncSession {
                 yQ: pose.yQ,
                 groupId: pose.groupId,
                 rev: pose.rev,
+                // Sent for completeness; the server commits x/y only here.
+                rotation: pose.rotation ?? 0,
               }),
             ),
+          }),
+        },
+      }),
+    )
+  }
+
+  /** Turn the held group about its anchor piece by clockwise quarter turns. */
+  sendRotate(input: {
+    anchorPieceIndex: number
+    groupId: number
+    quarterTurns: number
+  }): void {
+    event('networking', 'game.rotate.send', {
+      'jigsaw.game.id': this.gameId,
+      anchorPieceIndex: input.anchorPieceIndex,
+      groupId: input.groupId,
+      quarterTurns: input.quarterTurns,
+    })
+    this.sendClient(
+      StreamKind.INPUT,
+      create(ClientEnvelopeSchema, {
+        body: {
+          case: 'rotate',
+          value: create(RotateHeldSchema, {
+            anchorPieceIndex: input.anchorPieceIndex,
+            groupId: input.groupId,
+            quarterTurns: input.quarterTurns,
           }),
         },
       }),
