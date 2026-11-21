@@ -1,6 +1,7 @@
 import { event, withSpan } from '../otel/index.ts'
 import type { PuzzleModel } from './cut.ts'
 import { mixSeed, mulberry32 } from './random.ts'
+import { fittedOffset, pieceFootprint } from './rotation.ts'
 
 const SLOT_GAP = 0.28 * 2
 const SLOT_JITTER = 0.08
@@ -25,6 +26,11 @@ export interface Placement {
   x: number
   y: number
   group: string
+  /**
+   * Clockwise quarter turns, 0..3. The piece turns about the centre of its
+   * upright cell box; x, y stay that box's top-left corner.
+   */
+  rotation: number
 }
 
 export interface ScatteredBoard {
@@ -271,6 +277,7 @@ function scatterPiecesBody(model: PuzzleModel, seed: number): ScatteredBoard {
       x: (slot?.x ?? 0) + shiftX + jitterX,
       y: (slot?.y ?? 0) + shiftY + jitterY,
       group: id,
+      rotation: 0,
     }
   })
   return {
@@ -337,10 +344,11 @@ export function clampGroup(
   let maxDy = Number.POSITIVE_INFINITY
   for (const piece of placements) {
     if (piece.group !== group) continue
-    minDx = Math.max(minDx, area.minX + pad - piece.x)
-    maxDx = Math.min(maxDx, area.maxX - pad - cellW - piece.x)
-    minDy = Math.max(minDy, area.minY + pad - piece.y)
-    maxDy = Math.min(maxDy, area.maxY - pad - cellH - piece.y)
+    const box = pieceFootprint(piece, cellW, cellH)
+    minDx = Math.max(minDx, area.minX + pad - box.minX)
+    maxDx = Math.min(maxDx, area.maxX - pad - box.maxX)
+    minDy = Math.max(minDy, area.minY + pad - box.minY)
+    maxDy = Math.min(maxDy, area.maxY - pad - box.maxY)
   }
   const dx = x - anchor.x
   const dy = y - anchor.y
@@ -393,8 +401,11 @@ function approaches(
         pieceId(piece.col + side.dc, piece.row + side.dr),
       )
       if (!neighbor || neighbor.group === group) continue
-      const dx = neighbor.x - side.dc * cellW - piece.x
-      const dy = neighbor.y - side.dr * cellH - piece.y
+      // Pieces fit only when they are turned the same way.
+      if (neighbor.rotation !== piece.rotation) continue
+      const fit = fittedOffset(side.dc, side.dr, cellW, cellH, piece.rotation)
+      const dx = neighbor.x - fit.x - piece.x
+      const dy = neighbor.y - fit.y - piece.y
       found.push({
         pieceId: piece.id,
         neighborId: neighbor.id,
@@ -443,10 +454,11 @@ export function pieceBounds(
   let maxX = Number.NEGATIVE_INFINITY
   let maxY = Number.NEGATIVE_INFINITY
   for (const piece of placements) {
-    minX = Math.min(minX, piece.x - pad)
-    minY = Math.min(minY, piece.y - pad)
-    maxX = Math.max(maxX, piece.x + cellW + pad)
-    maxY = Math.max(maxY, piece.y + cellH + pad)
+    const box = pieceFootprint(piece, cellW, cellH)
+    minX = Math.min(minX, box.minX - pad)
+    minY = Math.min(minY, box.minY - pad)
+    maxX = Math.max(maxX, box.maxX + pad)
+    maxY = Math.max(maxY, box.maxY + pad)
   }
   if (!Number.isFinite(minX)) {
     return { minX: 0, minY: 0, maxX: 1, maxY: 1 }

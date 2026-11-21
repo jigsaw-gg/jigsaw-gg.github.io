@@ -5,6 +5,7 @@ import {
   type Camera,
   type Placement,
 } from './play.ts'
+import { pieceFootprint } from './rotation.ts'
 
 /** Full stick places the point of interest this many viewports from the group. */
 export const LOOK_VIEWPORTS = 1.5
@@ -154,7 +155,7 @@ export function pickGroupInDirection(
   return pickScreenTargetInDirection(candidates, from, null, direction)
 }
 
-/** Topmost group under a world point (cell hit boxes). Prefer `preferGroup`. */
+/** Topmost group under a world point (piece footprints). Prefer `preferGroup`. */
 export function groupAtWorld(
   placements: readonly Placement[],
   worldX: number,
@@ -166,11 +167,12 @@ export function groupAtWorld(
   let best: Placement | null = null
   let bestScore = -1
   for (const piece of placements) {
+    const box = pieceFootprint(piece, cellW, cellH)
     if (
-      worldX < piece.x ||
-      worldY < piece.y ||
-      worldX >= piece.x + cellW ||
-      worldY >= piece.y + cellH
+      worldX < box.minX ||
+      worldY < box.minY ||
+      worldX >= box.maxX ||
+      worldY >= box.maxY
     ) {
       continue
     }
@@ -197,10 +199,11 @@ export function groupWorldBounds(
   for (const piece of placements) {
     if (piece.group !== group) continue
     found = true
-    minX = Math.min(minX, piece.x)
-    minY = Math.min(minY, piece.y)
-    maxX = Math.max(maxX, piece.x + cellW)
-    maxY = Math.max(maxY, piece.y + cellH)
+    const box = pieceFootprint(piece, cellW, cellH)
+    minX = Math.min(minX, box.minX)
+    minY = Math.min(minY, box.minY)
+    maxX = Math.max(maxX, box.maxX)
+    maxY = Math.max(maxY, box.maxY)
   }
   if (!found) return null
   return { minX, minY, maxX, maxY }
@@ -217,10 +220,11 @@ export function piecesVisible(
 ): boolean {
   if (!(camera.zoom > 0) || placements.length === 0) return false
   for (const piece of placements) {
-    const x0 = piece.x * camera.zoom + camera.x
-    const y0 = piece.y * camera.zoom + camera.y
-    const x1 = (piece.x + cellW) * camera.zoom + camera.x
-    const y1 = (piece.y + cellH) * camera.zoom + camera.y
+    const box = pieceFootprint(piece, cellW, cellH)
+    const x0 = box.minX * camera.zoom + camera.x
+    const y0 = box.minY * camera.zoom + camera.y
+    const x1 = box.maxX * camera.zoom + camera.x
+    const y1 = box.maxY * camera.zoom + camera.y
     if (
       x0 < -slop ||
       y0 < -slop ||
