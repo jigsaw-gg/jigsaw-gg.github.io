@@ -407,9 +407,18 @@ function PlaySession({
                 <dt>{text.seed}</dt>
                 <dd>{setup.seed}</dd>
               </div>
+              <div>
+                <dt>{text.rotation}</dt>
+                <dd>
+                  {setup.rotationEnabled ? text.rotationOn : text.rotationOff}
+                </dd>
+              </div>
             </>
           )}
         </dl>
+        {setup?.rotationEnabled && (
+          <p className="muted play-rotation-hint">{text.rotationHint}</p>
+        )}
         {channelError && (
           <p className="banner banner--error" role="alert">
             {localizeError(channelError, messages.errors)}

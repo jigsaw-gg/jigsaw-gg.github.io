@@ -71,6 +71,8 @@ export interface Messages {
     arrangement: string
     pieceCount: (count: number) => string
     seed: string
+    rotate: string
+    rotateHint: string
     start: string
     starting: string
     createFailed: string
@@ -113,6 +115,10 @@ export interface Messages {
     image: string
     pieces: string
     seed: string
+    rotation: string
+    rotationOn: string
+    rotationOff: string
+    rotationHint: string
     asking: string
     playArea: string
     imageError: string

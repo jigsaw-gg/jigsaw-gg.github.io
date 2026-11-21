@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PlayerNameField } from '../components/PlayerNameField.tsx'
 import { createGame, GameHttpError } from '../game/gameClient.ts'
@@ -33,6 +33,8 @@ export function PuzzlesPage() {
   )
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE_URL)
   const [pieceCount, setPieceCount] = useState(String(DEFAULT_PIECE_COUNT))
+  const [rotationEnabled, setRotationEnabled] = useState(false)
+  const rotateHintId = useId()
   const [seed] = useState(() => crypto.getRandomValues(new Uint32Array(1))[0])
   const [imageSize, setImageSize] = useState<{
     width: number
@@ -90,7 +92,7 @@ export function PuzzlesPage() {
       imageHeight: imageSize.height,
       pieceCount: count,
       seed,
-      rotationEnabled: false,
+      rotationEnabled,
     }
     setStarting(true)
     setStartError(null)
@@ -213,6 +215,20 @@ export function PuzzlesPage() {
                 inputMode="numeric"
               />
             </label>
+            <div className="setup__rotate">
+              <label className="about-options__option setup__rotate-option">
+                <input
+                  type="checkbox"
+                  checked={rotationEnabled}
+                  onChange={(event) => setRotationEnabled(event.target.checked)}
+                  aria-describedby={rotateHintId}
+                />
+                {text.rotate}
+              </label>
+              <p id={rotateHintId} className="field__hint">
+                {text.rotateHint}
+              </p>
+            </div>
             <dl className="facts setup__facts">
               <div>
                 <dt>{text.imageSize}</dt>

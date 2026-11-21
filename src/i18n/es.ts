@@ -75,6 +75,9 @@ export const es: Messages = {
     arrangement: 'Disposición',
     pieceCount: (count) => `${count} ${count === 1 ? 'pieza' : 'piezas'}`,
     seed: 'Semilla',
+    rotate: 'Girar piezas',
+    rotateHint:
+      'Las piezas empiezan giradas y se pueden girar en cuartos de vuelta.',
     start: 'Empezar',
     starting: 'Creando…',
     createFailed: 'No se pudo crear la partida en el servidor.',
@@ -124,6 +127,11 @@ export const es: Messages = {
     image: 'Imagen',
     pieces: 'Piezas',
     seed: 'Semilla',
+    rotation: 'Giro',
+    rotationOn: 'Sí',
+    rotationOff: 'No',
+    rotationHint:
+      'Gira una pieza con R o con clic derecho, o tócala en una pantalla táctil.',
     asking: 'Cargando la configuración desde el servidor…',
     playArea: 'Área de juego',
     imageError: 'No se pudo cargar la imagen del puzle.',

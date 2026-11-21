@@ -83,6 +83,9 @@ export const ru: Messages = {
     arrangement: 'Раскладка',
     pieceCount: (count) => `${count} ${ruPieces(count)}`,
     seed: 'Зерно',
+    rotate: 'Поворот деталей',
+    rotateHint:
+      'Детали начинают повёрнутыми, их можно поворачивать на четверть оборота.',
     start: 'Начать',
     starting: 'Создание…',
     createFailed: 'Не удалось создать игру на сервере.',
@@ -130,6 +133,11 @@ export const ru: Messages = {
     image: 'Изображение',
     pieces: 'Детали',
     seed: 'Зерно',
+    rotation: 'Поворот',
+    rotationOn: 'Вкл.',
+    rotationOff: 'Выкл.',
+    rotationHint:
+      'Поверните деталь клавишей R или правым щелчком, на сенсорном экране — касанием.',
     asking: 'Загрузка настроек с игрового сервера…',
     playArea: 'Игровое поле',
     imageError: 'Не удалось загрузить изображение пазла.',

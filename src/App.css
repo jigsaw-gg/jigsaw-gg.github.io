@@ -816,6 +816,27 @@ textarea.gamepad-focused,
   margin-bottom: 1rem;
 }
 
+.setup__rotate {
+  margin-bottom: 0.9rem;
+}
+
+.setup__rotate-option {
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.setup__rotate-option input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.play-rotation-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
 .gallery-pick {
   margin-bottom: 0.9rem;
 }
