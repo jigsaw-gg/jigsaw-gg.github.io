@@ -1,5 +1,7 @@
-/** Standard mapping: Cross/A, Triangle/Y, L1, R1, L2, R2, D-pad. Sticks are axes 0–3. */
+/** Standard mapping: Cross/A, Circle/B, Square/X, Triangle/Y, L1, R1, L2, R2, D-pad. Sticks are axes 0–3. */
 const BUTTON_CROSS = 0
+const BUTTON_CIRCLE = 1
+const BUTTON_SQUARE = 2
 const BUTTON_TRIANGLE = 3
 const BUTTON_L1 = 4
 const BUTTON_R1 = 5
@@ -28,6 +30,10 @@ export interface SonyReading {
   right: PadAxes
   /** Cross (PS) / A (Xbox) — confirm / click. */
   cross: boolean
+  /** Circle (PS) / B (Xbox) — turn clockwise. */
+  circle: boolean
+  /** Square (PS) / X (Xbox) — turn counter-clockwise. */
+  square: boolean
   /** Triangle (PS) / Y (Xbox) — help overlay. */
   triangle: boolean
   l1: boolean
@@ -81,6 +87,8 @@ export function readStandardSony(pad: Gamepad): SonyReading | null {
     left: stickAxes(pad.axes[0] ?? 0, pad.axes[1] ?? 0),
     right: stickAxes(pad.axes[2] ?? 0, pad.axes[3] ?? 0),
     cross: pad.buttons?.[BUTTON_CROSS]?.pressed ?? false,
+    circle: pad.buttons?.[BUTTON_CIRCLE]?.pressed ?? false,
+    square: pad.buttons?.[BUTTON_SQUARE]?.pressed ?? false,
     triangle: pad.buttons?.[BUTTON_TRIANGLE]?.pressed ?? false,
     l1: pad.buttons?.[BUTTON_L1]?.pressed ?? false,
     r1: pad.buttons?.[BUTTON_R1]?.pressed ?? false,

@@ -147,6 +147,8 @@ export const es: Messages = {
       dpad: 'Salta el resaltado a una pieza cercana',
       triangle: 'Muestra u oculta esta ayuda',
       cross: 'Confirma el control de menú enfocado',
+      circle: 'Gira la pieza en sentido horario',
+      square: 'Gira la pieza en sentido antihorario',
     },
   },
   errors: {

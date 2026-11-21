@@ -52,6 +52,7 @@ import {
   type Placement,
   type ScatteredBoard,
 } from '../puzzle/play.ts'
+import { normalizeTurns, rotateGroup, turnVector } from '../puzzle/rotation.ts'
 import type { PuzzleSetup } from '../puzzle/session.ts'
 import {
   HANDOVER_MS,
@@ -86,6 +87,11 @@ const WIN_CAMERA_MS = 900
  * then settles on it.
  */
 const SNAP_RESPONSE = 22
+/** A touch or pen press this short and still turns the piece. */
+const TAP_MS = 300
+const TAP_TRAVEL_PX = 10
+/** Drag id for a turn of a group at rest (claim, turn, release at once). */
+const ROTATE_POINTER = -2
 
 /** Comfortable inset so the finished board fills the view without crowding. */
 function winFitMargin(viewportW: number, viewportH: number): number {
@@ -269,6 +275,7 @@ export function PuzzleBoard({
   onDrag,
   onDragEnd,
   onDragCancel,
+  onRotate,
 }: {
   setup: PuzzleSetup
   active: boolean
@@ -282,6 +289,7 @@ export function PuzzleBoard({
   onDrag: (placements: Placement[], anchorId: string) => void
   onDragEnd: (placements: Placement[]) => void
   onDragCancel: () => void
+  onRotate: (anchorId: string, quarterTurns: number) => void
 }) {
   return (
     <PuzzleTable
@@ -298,6 +306,7 @@ export function PuzzleBoard({
       onDrag={onDrag}
       onDragEnd={onDragEnd}
       onDragCancel={onDragCancel}
+      onRotate={onRotate}
     />
   )
 }
@@ -315,6 +324,7 @@ function PuzzleTable({
   onDrag,
   onDragEnd,
   onDragCancel,
+  onRotate,
 }: {
   setup: PuzzleSetup
   active: boolean
@@ -328,6 +338,7 @@ function PuzzleTable({
   onDrag: (placements: Placement[], anchorId: string) => void
   onDragEnd: (placements: Placement[]) => void
   onDragCancel: () => void
+  onRotate: (anchorId: string, quarterTurns: number) => void
 }) {
   const { messages } = useI18n()
   const model = useMemo(() => buildPuzzle(setup), [setup])
@@ -408,6 +419,8 @@ function PuzzleTable({
   const viewRef = useRef(view)
   const followRef = useRef(view)
   const dragRef = useRef<Drag | null>(null)
+  const mouseRef = useRef<{ x: number; y: number } | null>(null)
+  const turnKeyRef = useRef<(turns: number) => void>(() => {})
   const padGroupRef = useRef<string | null>(null)
   const padHoverRef = useRef<string | null>(null)
   const padHoverIdRef = useRef<string | null>(null)
@@ -422,6 +435,8 @@ function PuzzleTable({
     l1: false,
     r1: false,
     triangle: false,
+    circle: false,
+    square: false,
     up: false,
     down: false,
     leftPad: false,
@@ -942,6 +957,7 @@ function PuzzleTable({
 
   useEffect(() => {
     finishDragRef.current = finishDrag
+    turnKeyRef.current = turnFromKey
     commitViewRef.current = commitView
     gamepadTickRef.current = gamepadTick
   })
@@ -984,6 +1000,20 @@ function PuzzleTable({
     window.addEventListener('pagehide', onPageHide)
     return () => window.removeEventListener('pagehide', onPageHide)
   })
+
+  useEffect(() => {
+    if (!active || !setup.rotationEnabled) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      // The physical key, so R works on any keyboard layout.
+      if (event.code !== 'KeyR' || event.repeat) return
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      if (isTextEntry(event.target)) return
+      event.preventDefault()
+      turnKeyRef.current(event.shiftKey ? 3 : 1)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [active, setup.rotationEnabled])
 
   function rememberMembers(drag: Drag) {
     drag.memberIds = new Set(
@@ -1326,6 +1356,9 @@ function PuzzleTable({
   function onViewportPointerMoveCapture(
     event: React.PointerEvent<HTMLDivElement>,
   ) {
+    if (event.pointerType === 'mouse') {
+      mouseRef.current = { x: event.clientX, y: event.clientY }
+    }
     onViewportPointerMove(event)
     if (panRef.current?.pointerId === event.pointerId) return
     publishPointer(event.clientX, event.clientY)
@@ -1388,6 +1421,11 @@ function PuzzleTable({
       clientY: event.clientY,
       thumb,
       handoverSince: null,
+      pointerType: event.pointerType,
+      downAt: event.timeStamp,
+      downX: event.clientX,
+      downY: event.clientY,
+      travel: 0,
     }
     otelEvent('input', 'piece.drag_start', {
       pieceId: id,
@@ -1409,6 +1447,10 @@ function PuzzleTable({
       finishDrag(true)
       return
     }
+    drag.travel = Math.max(
+      drag.travel,
+      Math.hypot(event.clientX - drag.downX, event.clientY - drag.downY),
+    )
     drag.clientX = event.clientX
     drag.clientY = event.clientY
     const snapped = moveDragTo(event.clientX, event.clientY)
@@ -1729,6 +1771,11 @@ function PuzzleTable({
       clientY: 0,
       thumb: null,
       handoverSince: null,
+      pointerType: '',
+      downAt: 0,
+      downX: 0,
+      downY: 0,
+      travel: 0,
     }
     padGroupRef.current = placement.group
     setPadGroup(placement.group)
@@ -1791,6 +1838,8 @@ function PuzzleTable({
       clock.l1 = false
       clock.r1 = false
       clock.triangle = false
+      clock.circle = false
+      clock.square = false
       clock.up = false
       clock.down = false
       clock.leftPad = false
@@ -1814,6 +1863,8 @@ function PuzzleTable({
     }
     const l1Edge = reading.l1 && !clock.l1
     const triangleEdge = reading.triangle && !clock.triangle
+    const circleEdge = reading.circle && !clock.circle
+    const squareEdge = reading.square && !clock.square
     const upEdge = reading.up && !clock.up
     const downEdge = reading.down && !clock.down
     const leftEdge = reading.leftPad && !clock.leftPad
@@ -1821,6 +1872,8 @@ function PuzzleTable({
     clock.l1 = reading.l1
     clock.r1 = reading.r1
     clock.triangle = reading.triangle
+    clock.circle = reading.circle
+    clock.square = reading.square
     clock.up = reading.up
     clock.down = reading.down
     clock.leftPad = reading.leftPad
@@ -1830,6 +1883,7 @@ function PuzzleTable({
       helpOpenRef.current = next
       setGamepadHelpOpen(next)
     }
+    if (circleEdge !== squareEdge && canTurn()) turnFromPad(circleEdge ? 1 : 3)
     /** R1 halves stick speed while held. */
     const stickScale = reading.r1 ? 0.5 : 1
     const leftX = reading.left.x * stickScale
@@ -2209,7 +2263,146 @@ function PuzzleTable({
   function onPointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
     const drag = dragRef.current
     if (!drag || event.pointerId !== drag.pointerId) return
-    finishDrag(true)
+    const tap =
+      event.type === 'pointerup' &&
+      (drag.pointerType === 'touch' || drag.pointerType === 'pen') &&
+      event.timeStamp - drag.downAt <= TAP_MS &&
+      drag.travel < TAP_TRAVEL_PX
+    // Turn before the release, so the server sees claim, turn, release.
+    if (tap) turnHeld(1)
+    if (dragRef.current?.pointerId === event.pointerId) finishDrag(true)
+  }
+
+  function canTurn(): boolean {
+    return (
+      setup.rotationEnabled &&
+      active &&
+      !boardLockedRef.current &&
+      !pinchActiveRef.current
+    )
+  }
+
+  /**
+   * Turn the held group about the held piece. The held piece keeps its pose,
+   * so the grab offset holds; the move step then clamps and checks snaps.
+   */
+  function turnHeld(turns: number) {
+    const drag = dragRef.current
+    if (!drag || !canTurn()) return
+    const turned = rotateGroup(
+      placementsRef.current,
+      drag.group,
+      drag.id,
+      turns,
+    )
+    const pivot = turned.find((piece) => piece.id === drag.id)
+    if (turned === placementsRef.current || !pivot) return
+    placementsRef.current = turned
+    otelEvent('input', 'piece.rotate', {
+      pieceId: drag.id,
+      group: drag.group,
+      quarterTurns: turns,
+    })
+    onRotate(drag.id, turns)
+    const scale = viewRef.current.zoom > 0 ? viewRef.current.zoom : 1
+    moveDragToWorld(pivot.x, pivot.y, scale)
+  }
+
+  /** A turn of a group nobody holds is a claim, the turn and a release. */
+  function turnAtRest(id: string, turns: number) {
+    if (dragRef.current || !canTurn()) return
+    const placement = placementsRef.current.find((piece) => piece.id === id)
+    if (!placement) return
+    dragRef.current = {
+      pointerId: ROTATE_POINTER,
+      id,
+      group: placement.group,
+      grabX: 0,
+      grabY: 0,
+      memberIds: new Set(
+        placementsRef.current
+          .filter((piece) => piece.group === placement.group)
+          .map((piece) => piece.id),
+      ),
+      cruise: false,
+      clientX: 0,
+      clientY: 0,
+      thumb: null,
+      handoverSince: null,
+      pointerType: '',
+      downAt: 0,
+      downX: 0,
+      downY: 0,
+      travel: 0,
+    }
+    otelEvent('input', 'piece.drag_start', {
+      pieceId: id,
+      group: placement.group,
+      pointerType: 'rotate',
+      cruise: false,
+    })
+    setFrontGroup(placement.group)
+    onDrag(placementsRef.current, id)
+    turnHeld(turns)
+    if (dragRef.current?.pointerId === ROTATE_POINTER) finishDrag(true)
+  }
+
+  /** Controller target: the selected group, else the hovered piece. */
+  function turnFromPad(turns: number): boolean {
+    const drag = dragRef.current
+    if (drag && drag.pointerId !== GAMEPAD_POINTER) return false
+    const selected = selectionRef.current
+    if (selected) {
+      if (beginGamepadDrag(selected)) turnHeld(turns)
+      return true
+    }
+    const hovered = padHoverIdRef.current
+    if (!hovered) return false
+    turnAtRest(hovered, turns)
+    return true
+  }
+
+  function pieceAtClient(clientX: number, clientY: number): string | null {
+    const hit = document.elementFromPoint(clientX, clientY)
+    const canvas =
+      hit instanceof Element ? hit.closest<HTMLElement>('[data-piece]') : null
+    if (!canvas || !viewportRef.current?.contains(canvas)) return null
+    return canvas.dataset.piece ?? null
+  }
+
+  function turnFromKey(turns: number) {
+    if (!canTurn()) return
+    if (dragRef.current) {
+      turnHeld(turns)
+      return
+    }
+    const mouse = mouseRef.current
+    const id = mouse ? pieceAtClient(mouse.x, mouse.y) : null
+    if (id) {
+      turnAtRest(id, turns)
+      return
+    }
+    turnFromPad(turns)
+  }
+
+  function onViewportContextMenu(event: React.MouseEvent<HTMLDivElement>) {
+    if (!canTurn()) return
+    const native = event.nativeEvent as Partial<PointerEvent>
+    if (native.pointerType && native.pointerType !== 'mouse') return
+    const turns = event.shiftKey ? 3 : 1
+    if (dragRef.current) {
+      event.preventDefault()
+      turnHeld(turns)
+      return
+    }
+    const target = event.target
+    const id =
+      target instanceof Element
+        ? (target.closest<HTMLElement>('[data-piece]')?.dataset.piece ?? null)
+        : null
+    if (!id) return
+    event.preventDefault()
+    turnAtRest(id, turns)
   }
 
   const viewportClass = [
@@ -2232,8 +2425,12 @@ function PuzzleTable({
         onPointerMoveCapture={onViewportPointerMoveCapture}
         onPointerUp={endPan}
         onPointerCancel={endPan}
-        onPointerLeave={() => onPointerGone()}
+        onPointerLeave={() => {
+          mouseRef.current = null
+          onPointerGone()
+        }}
         onAuxClick={(event) => event.preventDefault()}
+        onContextMenu={onViewportContextMenu}
       >
         {failed ? (
           <p className="banner banner--error">{messages.play.imageError}</p>
@@ -2387,6 +2584,12 @@ function PuzzleTable({
                     ['R2', messages.play.gamepadHelp.r2],
                     ['D-pad', messages.play.gamepadHelp.dpad],
                     ['✕', messages.play.gamepadHelp.cross],
+                    ...(setup.rotationEnabled
+                      ? ([
+                          ['○', messages.play.gamepadHelp.circle],
+                          ['□', messages.play.gamepadHelp.square],
+                        ] as const)
+                      : []),
                   ] as const
                 ).map(([control, detail]) => (
                   <li key={control} className="gamepad-help__row">
@@ -2526,14 +2729,16 @@ function PieceCanvas({
   const { messages } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { cellW, cellH, pad } = layout
-  const width = cellW + pad * 2
-  const height = cellH + pad * 2
+  const rotation = normalizeTurns(placement.rotation)
+  const sideways = rotation % 2 === 1
+  const width = (sideways ? cellH : cellW) + pad * 2
+  const height = (sideways ? cellW : cellH) + pad * 2
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !image) return
-    drawPiece(canvas, image, piece, cellW, cellH, pad)
-  }, [image, piece, cellW, cellH, pad])
+    drawPiece(canvas, image, piece, cellW, cellH, pad, rotation)
+  }, [image, piece, cellW, cellH, pad, rotation])
 
   const glow = usePieceGlow(near, pulse)
   const className = ['piece', dragging ? 'piece--dragging' : '']
@@ -2544,8 +2749,8 @@ function PieceCanvas({
       ? `translate(${offsetX}px, ${offsetY}px)`
       : undefined
   const style: React.CSSProperties & { '--piece-glow': number } = {
-    left: placement.x - pad,
-    top: placement.y - pad,
+    left: placement.x + (cellW - width) / 2,
+    top: placement.y + (cellH - height) / 2,
     width,
     height,
     zIndex: raised ? 3 : near || glow > 0.04 ? 2 : 1,
@@ -2659,6 +2864,12 @@ interface Drag {
   clientY: number
   thumb: ThumbSide | null
   handoverSince: number | null
+  /** Press details, so a short still touch can count as a tap. */
+  pointerType: string
+  downAt: number
+  downX: number
+  downY: number
+  travel: number
 }
 
 interface ThumbStickView {
@@ -2757,6 +2968,17 @@ function isScreenControl(target: EventTarget | null): boolean {
   )
 }
 
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable) return true
+  if (target instanceof HTMLTextAreaElement) return true
+  if (target instanceof HTMLSelectElement) return true
+  if (!(target instanceof HTMLInputElement)) return false
+  return !['checkbox', 'radio', 'button', 'submit', 'reset', 'range'].includes(
+    target.type,
+  )
+}
+
 function releaseCaptured(viewport: HTMLElement, point: ScreenPoint): void {
   const target = point.target
   if (target instanceof Element && target.hasPointerCapture(point.id)) {
@@ -2774,9 +2996,13 @@ function drawPiece(
   cellW: number,
   cellH: number,
   pad: number,
+  rotation: number,
 ): void {
-  const width = cellW + pad * 2
-  const height = cellH + pad * 2
+  const uprightW = cellW + pad * 2
+  const uprightH = cellH + pad * 2
+  const sideways = rotation % 2 === 1
+  const width = sideways ? uprightH : uprightW
+  const height = sideways ? uprightW : uprightH
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   const bitmapW = Math.max(1, Math.round(width * dpr))
   const bitmapH = Math.max(1, Math.round(height * dpr))
@@ -2788,13 +3014,17 @@ function drawPiece(
   if (!ctx) return
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
+  // Draw the upright piece turned about the canvas centre (clockwise on screen).
+  ctx.translate(width / 2, height / 2)
+  ctx.rotate((rotation * Math.PI) / 2)
+  ctx.translate(-uprightW / 2, -uprightH / 2)
   const originX = piece.col * cellW - pad
   const originY = piece.row * cellH - pad
   trace(ctx, piece.points, originX, originY)
   ctx.save()
   ctx.clip()
   ctx.drawImage(image, -originX, -originY)
-  paintBevel(ctx, piece.points, originX, originY)
+  paintBevel(ctx, piece.points, originX, originY, rotation)
   ctx.restore()
 }
 
@@ -2824,10 +3054,14 @@ function paintBevel(
   points: Point[],
   originX: number,
   originY: number,
+  rotation: number,
 ): void {
   const ring = pieceRing(points, originX, originY)
   if (ring.length < 3) return
-  const light = clockVector(LIGHT_HOURS)
+  // The ring is in upright coordinates; turn the light back so it stays at
+  // 10:30 on screen whichever way the piece faces.
+  const sun = clockVector(LIGHT_HOURS)
+  const light = turnVector(sun.x, sun.y, 4 - rotation)
   const facing = edgeFacing(ring, light)
   const runs = bevelRuns(ring, facing)
   const corners = bevelCorners(ring, facing)

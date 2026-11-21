@@ -440,6 +440,7 @@ function PlaySession({
           onDrag={world.reportDrag}
           onDragEnd={world.reportDragEnd}
           onDragCancel={world.reportDragCancel}
+          onRotate={world.reportRotate}
         />
       )}
     </>

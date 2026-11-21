@@ -144,6 +144,8 @@ export const en: Messages = {
       dpad: 'Jump the highlight to a nearby piece',
       triangle: 'Show or hide this help',
       cross: 'Confirm a focused menu control',
+      circle: 'Turn the piece clockwise',
+      square: 'Turn the piece counter-clockwise',
     },
   },
   errors: {

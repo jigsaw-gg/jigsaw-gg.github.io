@@ -136,6 +136,8 @@ export interface Messages {
       dpad: string
       triangle: string
       cross: string
+      circle: string
+      square: string
     }
   }
   errors: {
