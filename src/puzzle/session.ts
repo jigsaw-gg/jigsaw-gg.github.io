@@ -25,6 +25,8 @@ export interface PuzzleSetup {
   imageHeight: number
   pieceCount: number
   seed: number
+  /** Pieces start turned and players may rotate them in quarter turns. */
+  rotationEnabled: boolean
 }
 
 export function createSessionId(): string {
@@ -79,6 +81,8 @@ export function parseSetup(data: unknown): PuzzleSetup | null {
     imageHeight,
     pieceCount,
     seed: seed >>> 0,
+    // Sessions cached before rotation existed have no flag: not rotating.
+    rotationEnabled: value.rotationEnabled === true,
   }
 }
 

@@ -60,6 +60,8 @@ export interface PieceStateJson {
   yQ: number
   groupId: number
   rev: number
+  /** Clockwise quarter turns, 0..3. Absent means upright. */
+  rotation?: number
 }
 
 export interface BoardSnapshotJson {
@@ -100,6 +102,7 @@ interface SetupJson {
   imageHeight: number
   pieceCount: number
   seed: number
+  rotationEnabled?: boolean
 }
 
 function toSetup(raw: SetupJson | undefined): PuzzleSetup {
@@ -112,6 +115,8 @@ function toSetup(raw: SetupJson | undefined): PuzzleSetup {
     imageHeight: Number(raw.imageHeight),
     pieceCount: Number(raw.pieceCount),
     seed: Number(raw.seed) >>> 0,
+    // A server without rotation drops the field: the game is not rotating.
+    rotationEnabled: raw.rotationEnabled === true,
   }
 }
 
@@ -156,6 +161,7 @@ export async function createGame(input: {
         'jigsaw.player.id': input.creatorPlayerId,
         pieceCount: input.setup.pieceCount,
         seed: input.setup.seed,
+        rotationEnabled: input.setup.rotationEnabled,
       })
       const raw = await postJson<{
         gameId: string
@@ -173,6 +179,7 @@ export async function createGame(input: {
           imageHeight: input.setup.imageHeight,
           pieceCount: input.setup.pieceCount,
           seed: input.setup.seed,
+          rotationEnabled: input.setup.rotationEnabled,
         },
       })
       const result = {

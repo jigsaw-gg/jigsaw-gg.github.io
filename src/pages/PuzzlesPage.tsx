@@ -90,6 +90,7 @@ export function PuzzlesPage() {
       imageHeight: imageSize.height,
       pieceCount: count,
       seed,
+      rotationEnabled: false,
     }
     setStarting(true)
     setStartError(null)
