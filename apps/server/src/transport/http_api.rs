@@ -21,6 +21,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tracing::{Instrument, warn};
 
+use crate::build_info;
 use crate::game::{GameStore, StoreError};
 use crate::otel;
 use crate::proto::game::v1::{
@@ -48,7 +49,21 @@ pub fn routes(state: HttpApiState) -> Router {
         .route("/v1/game/leave", post(leave_game))
         .route("/v1/game/{game_id}", get(get_game_path))
         .route("/v1/relay/ping", post(relay_ping))
+        .route("/v1/build", get(get_build))
         .with_state(Arc::new(state))
+}
+
+async fn get_build() -> Response {
+    let info = build_info::build_info();
+    (
+        StatusCode::OK,
+        [(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        )],
+        serde_json::to_vec(info).unwrap_or_default(),
+    )
+        .into_response()
 }
 
 // ===== GameSession ==========================================================

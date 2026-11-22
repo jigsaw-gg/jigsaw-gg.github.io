@@ -42,6 +42,8 @@ docker compose up --build
 
 Uses optional repo-root **`.docker.env`**, `apps/server/certs/`, and the same ports as `./manage.sh run-rust-server-local`.
 
+Compose builds the server with the workspace **`fast`** profile (see root `Cargo.toml`) and BuildKit cache mounts so dependency layers survive `src/` edits. For an optimized image: `CARGO_PROFILE=release docker compose build`.
+
 On Docker Desktop (macOS/Windows), published **UDP** ports can be unreliable from the host; TCP/WebSocket work normally. Prefer `cargo run` for local WebTransport bring-up.
 
 Endpoints:
@@ -51,6 +53,8 @@ Endpoints:
 - `http://127.0.0.1:21100/` — browser unary RPCs (`GameSession` + `Ping`)
 
 Health check: `GET http://127.0.0.1:21100/healthz`
+
+Build metadata (for About page): `GET http://127.0.0.1:21100/v1/build` → JSON `{ "commit", "log" }` from `BUILD_COMMIT` and `BUILD_COMMIT_LOG` (Docker build args or runtime env; `./manage.sh run-rust-server-local` plants git when unset).
 
 ## Local cargo run
 
@@ -65,8 +69,10 @@ Loads `.env`, optional `apps/server/.local.env`, and mkcert paths under `apps/se
 Direct Cargo (same manifest):
 
 ```bash
-cargo run --manifest-path apps/server/Cargo.toml --release
+cargo run --manifest-path apps/server/Cargo.toml --profile fast
 ```
+
+Use `--release` when you need a fully optimized binary; during active development `fast` matches the default Docker compose profile.
 
 Useful env vars / flags: `HTTP_ADDR`, `WEBTRANSPORT_ADDR`, `PUBLIC_HOST`, `CERT_DIR`, `CERT_FILE`, `KEY_FILE`, `DEFAULT_ROOM`, `RUST_LOG`.
 

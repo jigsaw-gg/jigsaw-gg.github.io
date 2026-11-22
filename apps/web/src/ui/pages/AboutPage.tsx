@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { useI18n } from '../i18n/useI18n.ts'
 import { useGameRelay } from '../../debug/relay/useGameRelay.ts'
+import { useServerBuildInfo } from '../../debug/useServerBuildInfo.ts'
 import type { RelayStatus } from '../../debug/relay/types.ts'
 import { playTelegramInviteUrl } from '../../telegram/config.ts'
 import { readTelegramDebugInfo } from '../../telegram/webApp.ts'
@@ -38,11 +39,68 @@ function formatLogTime(iso: string, locale: string): string {
   return date.toLocaleTimeString(locale)
 }
 
+function BuildCommitTarget({
+  label,
+  commit,
+  log,
+  logId,
+  logOpen,
+  onToggleLog,
+  commitShow,
+  commitHide,
+}: {
+  label: string
+  commit: string
+  log: string
+  logId: string
+  logOpen: boolean
+  onToggleLog: () => void
+  commitShow: string
+  commitHide: string
+}) {
+  if (!commit && !log) return null
+  return (
+    <div className="about-build-target">
+      <h3 className="about-build-target__title">{label}</h3>
+      {commit ? (
+        <p className="about-version">
+          <code className="about-version__commit">{commit}</code>
+        </p>
+      ) : null}
+      {log ? (
+        <div
+          className={
+            logOpen ? 'about-commit about-commit--open' : 'about-commit'
+          }
+        >
+          <pre id={logId} className="about-commit__log">
+            {log}
+          </pre>
+          <button
+            type="button"
+            className="button about-commit__toggle"
+            aria-expanded={logOpen}
+            aria-controls={logId}
+            onClick={onToggleLog}
+          >
+            {logOpen ? commitHide : commitShow}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function AboutPage() {
   const { locale, messages } = useI18n()
-  const [commitOpen, setCommitOpen] = useState(false)
+  const [webLogOpen, setWebLogOpen] = useState(false)
+  const [serverLogOpen, setServerLogOpen] = useState(false)
   const commit = import.meta.env.VITE_BUILD_COMMIT
   const commitLog = import.meta.env.VITE_BUILD_COMMIT_LOG
+  const serverBuild = useServerBuildInfo()
+  const serverCommit =
+    serverBuild.status === 'ready' ? serverBuild.info.commit : ''
+  const serverLog = serverBuild.status === 'ready' ? serverBuild.info.log : ''
   const telegram = readTelegramDebugInfo()
   const sampleInvite = playTelegramInviteUrl('sampleSessionId012345')
   const relay = useGameRelay()
@@ -58,7 +116,11 @@ export function AboutPage() {
     <main className="page">
       <h1>{about.title}</h1>
       <p className="lede">{about.lede}</p>
-      {commit || commitLog ? (
+      {commit ||
+      commitLog ||
+      serverCommit ||
+      serverLog ||
+      serverBuild.status === 'loading' ? (
         <section
           className="status-card about-commit-section"
           aria-labelledby="about-commit-title"
@@ -66,31 +128,37 @@ export function AboutPage() {
           <div className="status-card__header">
             <h2 id="about-commit-title">{about.version}</h2>
           </div>
-          {commit ? (
-            <p className="about-version">
-              <code className="about-version__commit">{commit}</code>
-            </p>
-          ) : null}
-          {commitLog ? (
-            <div
-              className={
-                commitOpen ? 'about-commit about-commit--open' : 'about-commit'
-              }
-            >
-              <pre id="about-commit-log" className="about-commit__log">
-                {commitLog}
-              </pre>
-              <button
-                type="button"
-                className="button about-commit__toggle"
-                aria-expanded={commitOpen}
-                aria-controls="about-commit-log"
-                onClick={() => setCommitOpen((open) => !open)}
-              >
-                {commitOpen ? about.commitHide : about.commitShow}
-              </button>
+          <BuildCommitTarget
+            label={about.versionWeb}
+            commit={commit}
+            log={commitLog}
+            logId="about-commit-log-web"
+            logOpen={webLogOpen}
+            onToggleLog={() => setWebLogOpen((open) => !open)}
+            commitShow={about.commitShow}
+            commitHide={about.commitHide}
+          />
+          {serverBuild.status === 'loading' ? (
+            <div className="about-build-target">
+              <h3 className="about-build-target__title">
+                {about.versionServer}
+              </h3>
+              <p className="about-version about-version--muted">
+                {about.versionServerLoading}
+              </p>
             </div>
-          ) : null}
+          ) : (
+            <BuildCommitTarget
+              label={about.versionServer}
+              commit={serverCommit}
+              log={serverLog}
+              logId="about-commit-log-server"
+              logOpen={serverLogOpen}
+              onToggleLog={() => setServerLogOpen((open) => !open)}
+              commitShow={about.commitShow}
+              commitHide={about.commitHide}
+            />
+          )}
         </section>
       ) : null}
 

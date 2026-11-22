@@ -85,6 +85,15 @@ elif [[ "$1" == "run-rust-server-local" ]]; then
     fi
     export CERT_DIR CERT_FILE KEY_FILE
 
+    if [[ -z "${BUILD_COMMIT:-}" ]]; then
+        BUILD_COMMIT="$(git -C "$ROOT_DIRECTORY_FULL_PATH" rev-parse --short=6 HEAD 2>/dev/null || true)"
+        export BUILD_COMMIT
+    fi
+    if [[ -z "${BUILD_COMMIT_LOG:-}" ]]; then
+        BUILD_COMMIT_LOG="$(git -C "$ROOT_DIRECTORY_FULL_PATH" --no-pager log -1 --no-color 2>/dev/null || true)"
+        export BUILD_COMMIT_LOG
+    fi
+
     exec cargo run --manifest-path "$SERVER_MANIFEST" "$@"
 
 else

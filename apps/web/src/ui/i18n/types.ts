@@ -31,6 +31,9 @@ export interface Messages {
     title: string
     lede: string
     version: string
+    versionWeb: string
+    versionServer: string
+    versionServerLoading: string
     commitShow: string
     commitHide: string
     telegramDebug: string

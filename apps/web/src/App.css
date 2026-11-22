@@ -477,9 +477,26 @@
   margin: 1.5rem 0;
 }
 
+.about-build-target + .about-build-target {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.about-build-target__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .about-version {
   margin: 0 0 0.75rem;
   font-size: 1rem;
+}
+
+.about-version--muted {
+  color: var(--muted);
 }
 
 .about-version__commit {

@@ -6,6 +6,11 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
+      args:
+        BUILD_COMMIT: ${BUILD_COMMIT:-server-placeholder-commit}
+        BUILD_COMMIT_LOG: ${BUILD_COMMIT_LOG:-server-placeholder-commit-log}
+        # fast profile — override with CARGO_PROFILE=release for optimized images
+        CARGO_PROFILE: ${CARGO_PROFILE:-fast}
     image: jigsaw-gg-server:${TAG:-latest}
     container_name: jigsaw-gg-server
     ports:

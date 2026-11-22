@@ -1,3 +1,4 @@
+mod build_info;
 mod config;
 mod game;
 mod hub;
