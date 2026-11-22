@@ -1,0 +1,44 @@
+[package]
+name = "jigsaw-gg-server"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Multi-transport game sync + relay (WebTransport, WebSocket, WebRTC, TCP, UDP)"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+axum = { version = "0.8.9", features = ["ws"] }
+bytes = "1.12.1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+dashmap = "6.2.1"
+futures = "0.3.34"
+futures-util = "0.3.34"
+prost = "0.14.6"
+rcgen = "0.14.10"
+rustls = "0.23.46"
+rustls-pemfile = "2.2.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["full"] }
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+tonic = "0.14.9"
+tonic-prost = "0.14.9"
+tower = "0.5.3"
+tower-http = { version = "0.7.1", features = ["cors", "trace"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tracing-opentelemetry = "0.31"
+opentelemetry = { version = "0.30", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.30", default-features = false, features = ["trace", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.30", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
+opentelemetry-semantic-conventions = "0.30"
+base64 = "0.22"
+uuid = { version = "1.29.2", features = ["v4"] }
+webrtc = "0.21.1"
+wtransport = "0.7.2"
+rand = "0.9"
+
+[build-dependencies]
+tonic-prost-build = "0.14.9"

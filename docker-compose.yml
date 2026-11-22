@@ -1,0 +1,37 @@
+# Game server — same ports/certs/env as `./manage.sh run-rust-server-local`.
+# Run from repo root: docker compose up --build
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: jigsaw-gg-server
+    ports:
+      - "127.0.0.1:21100:21100/tcp"
+      - "127.0.0.1:21101:21101/tcp"
+      - "127.0.0.1:21102:21102/tcp"
+      - "127.0.0.1:31100:31100/udp"
+      - "127.0.0.1:31101:31101/udp"
+      - "127.0.0.1:31102:31102/udp"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - path: .docker.env
+        required: false
+    environment:
+      RUST_LOG: info,jigsaw_gg_server=debug
+      HTTP_ADDR: 0.0.0.0:21100
+      GRPC_ADDR: 0.0.0.0:21101
+      TCP_ADDR: 0.0.0.0:21102
+      WEBTRANSPORT_ADDR: 0.0.0.0:31100
+      UDP_ADDR: 0.0.0.0:31101
+      WEBRTC_UDP_ADDR: 0.0.0.0:31102
+      PUBLIC_HOST: 127.0.0.1
+      CERT_DIR: /app/certs
+      CERT_FILE: /app/certs/localhost+1.pem
+      KEY_FILE: /app/certs/localhost+1-key.pem
+      DEFAULT_ROOM: default
+    volumes:
+      - ./apps/server/certs:/app/certs:ro
+    restart: unless-stopped

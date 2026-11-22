@@ -1,6 +1,7 @@
-const DEFAULT_GAME_HTTP_URL = 'http://jigsaw-gg.duckdns.org:21100'
-const DEFAULT_GAME_WEBTRANSPORT_URL = 'https://jigsaw-gg.duckdns.org:31100'
-const DEFAULT_GAME_WEBSOCKET_URL = 'ws://jigsaw-gg.duckdns.org:21100'
+/** Match `./manage.sh run-rust-server-local` default bind ports (see `apps/server`). */
+const DEFAULT_GAME_HTTP_URL = 'http://127.0.0.1:21100'
+const DEFAULT_GAME_WEBTRANSPORT_URL = 'https://127.0.0.1:31100'
+const DEFAULT_GAME_WEBSOCKET_URL = 'ws://127.0.0.1:21100'
 
 function readEnv(name: keyof ImportMetaEnv): string {
   const raw = import.meta.env[name]

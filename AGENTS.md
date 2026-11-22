@@ -1,6 +1,8 @@
 # jigsaw-gg
 
-Vite + React + TypeScript jigsaw, deployed as a static site to GitHub Pages at the domain root. There is no application server in this repo. Multiplayer goes through **jigsaw-gg-server**: HTTP lobby (`CreateGame` / `JoinGame`) plus WebTransport or WebSocket `/game` play streams (`game.v1` `StreamFrame`s).
+Monorepo: **`apps/web`** — Vite + React + TypeScript client (GitHub Pages at the domain root). **`apps/server`** — Rust game server (`jigsaw-gg-server` crate). Wire contracts live in repo-root **`proto/`**. Local play: `npm run dev` + `./manage.sh run-rust-server-local` (repo-root `.env` + optional `apps/server/.local.env`; WebTransport certs under `apps/server/certs/`).
+
+Multiplayer: HTTP lobby (`CreateGame` / `JoinGame`) plus WebTransport or WebSocket `/game` play streams (`game.v1` `StreamFrame`s).
 
 ## Commands
 
@@ -11,11 +13,14 @@ Vite + React + TypeScript jigsaw, deployed as a static site to GitHub Pages at t
 
 There is no test runner. For a UI change, run the dev server and use the page.
 
-`uvx pre-commit run -a` runs the repo hooks (whitespace, Prettier, ESLint). `./manage.sh pre-commit` runs that same suite after `git add -A`. Use the wrapper only when the user asked for pre-commit. ESLint includes `eslint-plugin-boundaries` (package import matrix); the `eslint-local` pre-commit hook runs the same `npx eslint .`.
+`uvx pre-commit run -a` runs the repo hooks (whitespace, Prettier, ESLint, Rust fmt/check/clippy). `./manage.sh pre-commit` runs that same suite after `git add -A`. Use the wrapper only when the user asked for pre-commit. ESLint includes `eslint-plugin-boundaries` (package import matrix); the `eslint-local` pre-commit hook runs `npx eslint apps/web`.
+
+- Local game server: `./manage.sh run-rust-server-local` (loads repo-root `.env`, then `apps/server/.local.env` when present; needs mkcert files in `apps/server/certs/`)
+- Regenerate TS protos: `./manage.sh gen-proto` or `npm run gen:proto`
 
 ## Source packages
 
-Target layout under `src/`: `core`, `otel`, `network`, `jigsaw`, `world`, `draw`, `input`, `play`, `debug`, `ui`, plus bootstrap `app` (`main.tsx` / `App.tsx`). **Default forbid** cross-package imports; allowed edges and migration notes live in [`dev/architecture.md`](dev/architecture.md). Prefer each package’s `index.ts` as the public surface; impl files must not import their own `index.ts`. Legacy folders (`game/`, `puzzle/`, `components/`, …) remain until migrated and are not boundary-checked yet.
+Target layout under `apps/web/src/`: `core`, `otel`, `network`, `jigsaw`, `world`, `draw`, `input`, `play`, `debug`, `ui`, plus bootstrap `app` (`main.tsx` / `App.tsx`). **Default forbid** cross-package imports; allowed edges and migration notes live in [`dev/architecture.md`](dev/architecture.md). Prefer each package’s `index.ts` as the public surface; impl files must not import their own `index.ts`. Legacy folders (`game/`, `puzzle/`, `components/`, …) remain until migrated and are not boundary-checked yet.
 
 ## Dev server port
 
@@ -46,7 +51,7 @@ The browser exports traces directly to OpenObserve over OTLP/HTTP when
 `OTEL_ENABLED_FOR` is a semicolon-separated category list
 (`bootstrap`, `networking`, `piece-logic`, `input`). Empty or `all` enables
 every category. Call sites always use `withSpan` / `event` / `startSpan` from
-`src/otel/` — they never branch on whether OTEL is on; the helpers no-op when
+`apps/web/src/otel/` — they never branch on whether OTEL is on; the helpers no-op when
 the endpoint is missing or the category is filtered.
 
 Every span carries `jigsaw.tab.id` (new ULID-like id per document load). While
@@ -149,8 +154,8 @@ on the server with what the observer tab did or did not emit.
 
 ## Protocol contract (client ↔ server)
 
-`proto/game.proto` is the source of truth for play-stream semantics (copied
-from `jigsaw-gg-server` via `./scripts/gen-proto.sh`). When the server does
+`proto/game.proto` is the source of truth for play-stream semantics (shared by
+`apps/server` prost build and `./scripts/gen-proto.sh`). When the server does
 something the client did not expect — or the reverse — **document the intended
 behavior in that proto** (message/field comments), then align the
 implementation to the comment. Prefer fixing the side that violates the
@@ -173,9 +178,9 @@ Client config (local `.env` or Pages variables):
 - `VITE_GAME_HTTP_URL` — lobby base (`http://127.0.0.1:21100` locally)
 - `VITE_GAME_WEBTRANSPORT_URL` / `VITE_GAME_WEBSOCKET_URL` — play + relay origins (scheme/host/port). Relay probe appends `/relay` and `/ws`.
 
-Proto sources live in `jigsaw-gg-server`; `./scripts/gen-proto.sh` copies them and regenerates `src/network/gen/*_pb.ts`. Keep `proto/game.proto` in sync with the server.
+Edit protos under `proto/`, then `./manage.sh gen-proto` (or `npm run gen:proto`) to refresh `apps/web/src/network/gen/*_pb.ts`; `cargo build` in `apps/server` picks up the same files via `build.rs`.
 
-A worktree may copy `.env` from the main checkout via `scripts/setup-worktree.sh`. Point that env at a running local `jigsaw-gg-server`.
+A worktree may copy `.env` from the main checkout via `scripts/setup-worktree.sh`. Vite reads that file via `envDir` at the repo root (`apps/web/vite.config.ts`). Point `VITE_GAME_*` at a running local server (`./manage.sh run-rust-server-local`; client fallbacks are `127.0.0.1:21100` / `:31100` when unset).
 
 ## Puzzle sessions
 

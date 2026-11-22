@@ -19,5 +19,9 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "dev/browserLogPlugin.ts", "dev/devHttps.ts"]
+  "include": [
+    "vite.config.ts",
+    "../../dev/browserLogPlugin.ts",
+    "../../dev/devHttps.ts"
+  ]
 }

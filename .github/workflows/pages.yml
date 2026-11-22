@@ -1,8 +1,8 @@
 # Build Vite app and deploy to GitHub Pages.
 # Optional repository variables (Settings → Variables):
 #   VITE_GAME_HTTP_URL, VITE_GAME_WEBTRANSPORT_URL, VITE_GAME_WEBSOCKET_URL
-# Defaults in src/game/config.ts point at the public jigsaw-gg-server host when
-# unset. Relay probe URLs are derived from the play origins (`/relay`, `/ws`).
+# Set repository VITE_GAME_* variables for production; client fallbacks are
+# 127.0.0.1 when unset. Relay probe URLs are derived from the play origins (`/relay`, `/ws`).
 # OTEL is never inlined here: vite production mode clears OTEL_* so the Pages
 # bundle has no exporter credentials or SDK chunk.
 #
@@ -52,7 +52,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: apps/web/dist
 
   deploy:
     needs: build

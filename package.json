@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "format": "prettier --write --config .prettierrc \"src/**/*.{ts,tsx,css}\" \"index.html\"",
+    "dev": "vite --config apps/web/vite.config.ts",
+    "build": "tsc -b && vite build --config apps/web/vite.config.ts",
+    "lint": "eslint apps/web",
+    "format": "prettier --write --config .prettierrc \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/web/index.html\"",
     "gen:proto": "./manage.sh gen-proto",
     "preview": "vite preview",
     "prepare": "husky"

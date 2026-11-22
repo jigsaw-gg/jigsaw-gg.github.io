@@ -1,0 +1,9 @@
+/target
+/certs/*.pem
+/certs/*.key
+/certs/*.crt
+.DS_Store
+.env
+*.swp
+.idea
+.vscode

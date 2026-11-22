@@ -10,8 +10,12 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+apps/web/dist
+apps/server/target
 *.local
 tmp/
+
+target/
 
 .env
 .env.*

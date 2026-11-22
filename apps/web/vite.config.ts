@@ -5,8 +5,11 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
-import { browserLogPlugin } from './dev/browserLogPlugin.ts'
-import { lanHttpsOptions } from './dev/devHttps.ts'
+import { browserLogPlugin } from '../../dev/browserLogPlugin.ts'
+import { lanHttpsOptions } from '../../dev/devHttps.ts'
+
+const webRoot = fileURLToPath(new URL('.', import.meta.url))
+const repoRoot = resolve(webRoot, '../..')
 
 const SHARE_IMAGE = 'share.png'
 const SHARE_IMAGE_HOST = 'https://jigsaw-gg.github.io'
@@ -25,7 +28,7 @@ function shareImageCacheBust(): Plugin {
     name: 'share-image-cache-bust',
     apply: 'build',
     buildStart() {
-      const source = resolve('public', SHARE_IMAGE)
+      const source = resolve(webRoot, 'public', SHARE_IMAGE)
       const hash = createHash('sha256')
         .update(readFileSync(source))
         .digest('hex')
@@ -39,7 +42,10 @@ function shareImageCacheBust(): Plugin {
     },
     writeBundle() {
       if (hashedName === SHARE_IMAGE) return
-      renameSync(resolve('dist', SHARE_IMAGE), resolve('dist', hashedName))
+      renameSync(
+        resolve(webRoot, 'dist', SHARE_IMAGE),
+        resolve(webRoot, 'dist', hashedName),
+      )
     },
   }
 }
@@ -54,7 +60,7 @@ function githubPagesSpaFallback(): Plugin {
     name: 'github-pages-spa-fallback',
     apply: 'build',
     writeBundle() {
-      const outDir = resolve('dist')
+      const outDir = resolve(webRoot, 'dist')
       const index = resolve(outDir, 'index.html')
       copyFileSync(index, resolve(outDir, '404.html'))
       for (const dir of ['play', 'about']) {
@@ -76,7 +82,7 @@ function duplicateAgentsMd(): Plugin {
     name: 'duplicate-agents-md',
     apply: 'build',
     writeBundle() {
-      const outDir = resolve('dist')
+      const outDir = resolve(webRoot, 'dist')
       copyFileSync(resolve(outDir, 'agents.md'), resolve(outDir, 'AGENTS.md'))
     },
   }
@@ -133,7 +139,7 @@ function resolveOtel(mode: string): OtelEnv {
       enabledFor: '',
     }
   }
-  const fileEnv = loadEnv(mode, process.cwd(), '')
+  const fileEnv = loadEnv(mode, repoRoot, '')
   const pick = (...keys: string[]) => {
     for (const key of keys) {
       const fromProcess = process.env[key]
@@ -177,7 +183,7 @@ type LocalConfig = {
 function readLocalConfig(): LocalConfig {
   try {
     return JSON.parse(
-      readFileSync(resolve('config.json'), 'utf8'),
+      readFileSync(resolve(repoRoot, 'config.json'), 'utf8'),
     ) as LocalConfig
   } catch {
     return {}
@@ -196,7 +202,7 @@ function resolveTelegramIdentity(mode: string): {
   app: string
   title: string
 } {
-  const fileEnv = loadEnv(mode, process.cwd(), '')
+  const fileEnv = loadEnv(mode, repoRoot, '')
   const local = readLocalConfig()
   const bot = (
     process.env.VITE_TELEGRAM_BOT_USERNAME ||
@@ -227,10 +233,7 @@ function resolveTelegramIdentity(mode: string): {
 
 function worktreeDevPort(): number | undefined {
   try {
-    const path = resolve(
-      fileURLToPath(new URL('.', import.meta.url)),
-      '.worktree-port',
-    )
+    const path = resolve(repoRoot, '.worktree-port')
     const raw = readFileSync(path, 'utf8').trim()
     const port = Number(raw)
     if (!Number.isInteger(port) || port < 1 || port > 65535) return undefined
@@ -258,6 +261,8 @@ export default defineConfig(({ mode }) => {
         }
       : undefined
   return {
+    root: webRoot,
+    envDir: repoRoot,
     // jigsaw-gg.github.io is served from the domain root.
     base: '/',
     server,

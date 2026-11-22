@@ -16,7 +16,7 @@ repos:
     hooks:
       - id: eslint-local
         name: eslint-local
-        entry: bash -c 'npx eslint .'
+        entry: bash -c 'npx eslint apps/web'
         language: system
         types: [file]
         files: \.(ts|tsx)$
@@ -30,4 +30,27 @@ repos:
         language: system
         types: [file]
         files: \.(ts|tsx|json|css|md|html)$
+        pass_filenames: false
+
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        name: rustfmt
+        files: ^apps/server/.*\.rs$
+        args: [--manifest-path=apps/server/Cargo.toml, --]
+      - id: cargo-check
+        name: cargo-check
+        files: ^apps/server/.*\.(rs|toml)$
+        args: [--manifest-path=apps/server/Cargo.toml]
+        pass_filenames: false
+      - id: clippy
+        name: clippy
+        files: ^apps/server/.*\.(rs|toml)$
+        args:
+          - --manifest-path=apps/server/Cargo.toml
+          - --all-targets
+          - --
+          - -D
+          - warnings
         pass_filenames: false
