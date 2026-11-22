@@ -10,8 +10,8 @@
 //! - Env set (possibly empty) → only listed categories
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use dashmap::DashMap;
 

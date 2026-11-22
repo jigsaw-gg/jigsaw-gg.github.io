@@ -39,4 +39,21 @@ pub struct Config {
     /// Max datagram / frame size in bytes
     #[arg(long, env = "MAX_PAYLOAD_BYTES", default_value_t = 65_535)]
     pub max_payload_bytes: usize,
+
+    // ── Network glitch (play `/game` + opaque relay only) ───────────────────
+    /// Simulated mean one-way latency for impaired frames (milliseconds).
+    #[arg(long, env = "NETWORK_GLITCH_LATENCY_MS", default_value_t = 0)]
+    pub network_glitch_latency_ms: u64,
+
+    /// Latency jitter half-range in milliseconds (± around mean, floored at 0).
+    #[arg(long, env = "NETWORK_GLITCH_LATENCY_JITTER_MS", default_value_t = 0)]
+    pub network_glitch_latency_jitter_ms: u64,
+
+    /// Percentage of impaired frames to drop (0–100). Welcome on `/game` is never dropped.
+    #[arg(long, env = "NETWORK_GLITCH_DROP_PERCENT", default_value_t = 0.0)]
+    pub network_glitch_drop_percent: f64,
+
+    /// Percentage of impaired frames to deliver twice after the delay (0–100).
+    #[arg(long, env = "NETWORK_GLITCH_DUP_PERCENT", default_value_t = 0.0)]
+    pub network_glitch_dup_percent: f64,
 }

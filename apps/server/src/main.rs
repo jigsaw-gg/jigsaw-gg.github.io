@@ -2,6 +2,7 @@ mod build_info;
 mod config;
 mod game;
 mod hub;
+mod network_glitch;
 mod otel;
 mod proto;
 mod tls;
@@ -10,6 +11,7 @@ mod transport;
 use crate::config::Config;
 use crate::game::GameStore;
 use crate::hub::Hub;
+use crate::network_glitch::NetworkGlitch;
 use crate::tls::ensure_dev_certs;
 use clap::Parser;
 use tracing::info;
@@ -23,6 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let provider = otel::init_tracing().map_err(|e| anyhow::anyhow!(e))?;
 
     let config = Config::parse();
+    let network_glitch = NetworkGlitch::from_config(&config)?;
     let tls = ensure_dev_certs(
         &config.cert_dir,
         &config.public_host,
@@ -41,19 +44,20 @@ async fn main() -> anyhow::Result<()> {
 
     let http_hub = hub.clone();
     let http_games = games.clone();
+    let http_glitch = network_glitch.clone();
     let http_addr = config.http_addr;
-    let http =
-        tokio::spawn(
-            async move { transport::websocket::serve(http_addr, http_hub, http_games).await },
-        );
+    let http = tokio::spawn(async move {
+        transport::websocket::serve(http_addr, http_hub, http_games, http_glitch).await
+    });
 
     let wt_hub = hub.clone();
     let wt_games = games.clone();
     let wt_addr = config.webtransport_addr;
     let wt_host = config.public_host.clone();
     let wt_tls = tls.clone();
+    let wt_glitch = network_glitch;
     let webtransport = tokio::spawn(async move {
-        transport::webtransport::serve(wt_addr, wt_hub, wt_games, wt_tls, wt_host).await
+        transport::webtransport::serve(wt_addr, wt_hub, wt_games, wt_tls, wt_host, wt_glitch).await
     });
 
     let result = tokio::select! {

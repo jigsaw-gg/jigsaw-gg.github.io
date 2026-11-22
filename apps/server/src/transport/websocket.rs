@@ -1,6 +1,7 @@
 use crate::game::GameStore;
 use crate::game::handle_websocket_game;
 use crate::hub::{Hub, TransportKind};
+use crate::network_glitch::{NetworkGlitch, OutboundPlan};
 use crate::transport::http_api::{self, HttpApiState};
 use axum::Router;
 use axum::extract::ws::{Message, WebSocket};
@@ -19,6 +20,7 @@ use tracing::{debug, info, warn};
 pub struct HttpState {
     pub hub: Hub,
     pub games: GameStore,
+    pub network_glitch: NetworkGlitch,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,7 +73,14 @@ async fn game_ws_upgrade(
             warn!("ws /game missing game_id or player_id");
             return;
         }
-        handle_websocket_game(socket, state.games.clone(), game_id, player_id).await;
+        handle_websocket_game(
+            socket,
+            state.games.clone(),
+            game_id,
+            player_id,
+            state.network_glitch.clone(),
+        )
+        .await;
     })
 }
 
@@ -92,21 +101,56 @@ async fn handle_socket(socket: WebSocket, state: Arc<HttpState>, query: WsQuery)
     let client_id_out = client_id.clone();
     let room_out = room.clone();
 
+    let glitch_out = state.network_glitch.clone();
     let send_task = tokio::spawn(async move {
         while let Some(msg) = outbound.recv().await {
-            if sink.send(Message::Binary(msg.payload)).await.is_err() {
-                break;
+            let payload = msg.payload;
+            let plan = glitch_out.plan_outbound("ws-relay").await;
+            match plan {
+                OutboundPlan::Drop => {}
+                OutboundPlan::Once | OutboundPlan::Twice => {
+                    if sink.send(Message::Binary(payload.clone())).await.is_err() {
+                        break;
+                    }
+                    if plan == OutboundPlan::Twice {
+                        glitch_out.duplicate_outbound_delay().await;
+                        if sink.send(Message::Binary(payload)).await.is_err() {
+                            break;
+                        }
+                    }
+                }
             }
         }
     });
 
+    let glitch_in = state.network_glitch.clone();
     while let Some(Ok(message)) = stream.next().await {
         match message {
             Message::Binary(payload) => {
-                hub.broadcast(&client_id, &room, payload).await;
+                if glitch_in.impair_inbound().await {
+                    continue;
+                }
+                let payload = Bytes::from(payload);
+                let hub_in = hub.clone();
+                let cid = client_id.clone();
+                let room_in = room.clone();
+                hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                if glitch_in.should_repeat_inbound().await {
+                    hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                }
             }
             Message::Text(text) => {
-                hub.broadcast(&client_id, &room, Bytes::from(text)).await;
+                if glitch_in.impair_inbound().await {
+                    continue;
+                }
+                let payload = Bytes::from(text);
+                let hub_in = hub.clone();
+                let cid = client_id.clone();
+                let room_in = room.clone();
+                hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                if glitch_in.should_repeat_inbound().await {
+                    hub_in.broadcast(&cid, &room_in, payload).await;
+                }
             }
             Message::Ping(payload) => {
                 debug!(%client_id, bytes = payload.len(), "ws ping");
@@ -121,8 +165,17 @@ async fn handle_socket(socket: WebSocket, state: Arc<HttpState>, query: WsQuery)
     info!(client_id = %client_id_out, room = %room_out, "websocket client disconnected");
 }
 
-pub async fn serve(addr: std::net::SocketAddr, hub: Hub, games: GameStore) -> anyhow::Result<()> {
-    let app = router(HttpState { hub, games });
+pub async fn serve(
+    addr: std::net::SocketAddr,
+    hub: Hub,
+    games: GameStore,
+    network_glitch: NetworkGlitch,
+) -> anyhow::Result<()> {
+    let app = router(HttpState {
+        hub,
+        games,
+        network_glitch,
+    });
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!(%addr, "HTTP/WebSocket + unary API listening");
     axum::serve(listener, app).await?;

@@ -2,6 +2,7 @@ use crate::game::GameStore;
 use crate::game::framing::{FrameReader, encode_frame};
 use crate::game::sync::{attach_play_session, client_envelope_from_frame, stream_kind};
 use crate::hub::{Hub, TransportKind};
+use crate::network_glitch::{NetworkGlitch, OutboundPlan};
 use crate::otel;
 use crate::proto::game::v1::{StreamKind, TransportKind as GameTransportKind};
 use crate::tls::TlsMaterial;
@@ -19,6 +20,7 @@ pub async fn serve(
     games: GameStore,
     tls: TlsMaterial,
     public_host: String,
+    network_glitch: NetworkGlitch,
 ) -> anyhow::Result<()> {
     let identity = Identity::load_pemfiles(&tls.cert_path, &tls.key_path)
         .await
@@ -43,8 +45,9 @@ pub async fn serve(
         let incoming = server.accept().await;
         let hub = hub.clone();
         let games = games.clone();
+        let glitch = network_glitch.clone();
         tokio::spawn(async move {
-            if let Err(err) = handle_session(incoming, hub, games).await {
+            if let Err(err) = handle_session(incoming, hub, games, glitch).await {
                 warn!(error = %err, "WebTransport session ended with error");
             }
         });
@@ -55,6 +58,7 @@ async fn handle_session(
     incoming: IncomingSession,
     hub: Hub,
     games: GameStore,
+    network_glitch: NetworkGlitch,
 ) -> anyhow::Result<()> {
     let request = incoming.await?;
     let path = request.path().to_string();
@@ -67,9 +71,9 @@ async fn handle_session(
     let connection = request.accept().await?;
 
     if path_is_game(&path) {
-        handle_game_session(connection, games, &path).await
+        handle_game_session(connection, games, &path, network_glitch).await
     } else {
-        handle_relay_session(connection, hub, &path).await
+        handle_relay_session(connection, hub, &path, network_glitch).await
     }
 }
 
@@ -82,6 +86,7 @@ async fn handle_game_session(
     connection: wtransport::Connection,
     games: GameStore,
     path: &str,
+    network_glitch: NetworkGlitch,
 ) -> anyhow::Result<()> {
     let (game_id, player_id) = parse_game_query(path);
     if game_id.is_empty() || player_id.is_empty() {
@@ -128,6 +133,8 @@ async fn handle_game_session(
         let games2 = games.clone();
         let gid = game_id.clone();
         let pid = player_id.clone();
+        let glitch_in = network_glitch.clone();
+        let glitch_out = network_glitch;
 
         loop {
             tokio::select! {
@@ -147,10 +154,21 @@ async fn handle_game_session(
                                     }
                                     classified = true;
                                 }
+                                if glitch_in.impair_inbound().await {
+                                    continue;
+                                }
                                 if let Some(env) = client_envelope_from_frame(&frame) {
                                     games2.touch_activity(&gid);
                                     if let Some(room) = games2.room(&gid) {
-                                        room.push_input(&pid, env).await;
+                                        room.push_input(&pid, env.clone()).await;
+                                        let games_dup = games2.clone();
+                                        let gid_dup = gid.clone();
+                                        let pid_dup = pid.clone();
+                                        if glitch_in.should_repeat_inbound().await {
+                                            if let Some(room) = games_dup.room(&gid_dup) {
+                                                room.push_input(&pid_dup, env.clone()).await;
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -173,10 +191,21 @@ async fn handle_game_session(
                                     classified = true;
                                 }
                                 // World uplink: Resync / Pace only.
+                                if glitch_in.impair_inbound().await {
+                                    continue;
+                                }
                                 if let Some(env) = client_envelope_from_frame(&frame) {
                                     games2.touch_activity(&gid);
                                     if let Some(room) = games2.room(&gid) {
-                                        room.push_input(&pid, env).await;
+                                        room.push_input(&pid, env.clone()).await;
+                                        let games_dup = games2.clone();
+                                        let gid_dup = gid.clone();
+                                        let pid_dup = pid.clone();
+                                        if glitch_in.should_repeat_inbound().await {
+                                            if let Some(room) = games_dup.room(&gid_dup) {
+                                                room.push_input(&pid_dup, env.clone()).await;
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -186,14 +215,40 @@ async fn handle_game_session(
                 }
                 frame = input_rx.recv() => {
                     let Some(frame) = frame else { break; };
-                    if input_send.write_all(encode_frame(&frame).as_ref()).await.is_err() {
-                        break;
+                    let bytes = encode_frame(&frame);
+                    let plan = glitch_out.plan_outbound("wt-game-input").await;
+                    match plan {
+                        OutboundPlan::Drop => {}
+                        OutboundPlan::Once | OutboundPlan::Twice => {
+                            if input_send.write_all(bytes.as_ref()).await.is_err() {
+                                break;
+                            }
+                            if plan == OutboundPlan::Twice {
+                                glitch_out.duplicate_outbound_delay().await;
+                                if input_send.write_all(bytes.as_ref()).await.is_err() {
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
                 frame = world_rx.recv() => {
                     let Some(frame) = frame else { break; };
-                    if world_send.write_all(encode_frame(&frame).as_ref()).await.is_err() {
-                        break;
+                    let bytes = encode_frame(&frame);
+                    let plan = glitch_out.plan_outbound("wt-game-world").await;
+                    match plan {
+                        OutboundPlan::Drop => {}
+                        OutboundPlan::Once | OutboundPlan::Twice => {
+                            if world_send.write_all(bytes.as_ref()).await.is_err() {
+                                break;
+                            }
+                            if plan == OutboundPlan::Twice {
+                                glitch_out.duplicate_outbound_delay().await;
+                                if world_send.write_all(bytes.as_ref()).await.is_err() {
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -213,6 +268,7 @@ async fn handle_relay_session(
     connection: wtransport::Connection,
     hub: Hub,
     path: &str,
+    network_glitch: NetworkGlitch,
 ) -> anyhow::Result<()> {
     let (room, client_hint) = parse_path_query(path, hub.default_room());
     let (client_id, room, mut outbound) = hub.join(room, client_hint, TransportKind::WebTransport);
@@ -223,23 +279,48 @@ async fn handle_relay_session(
     let client_id_out = client_id.clone();
     let room_out = room.clone();
     let send_client_id = client_id.clone();
+    let glitch_out = network_glitch.clone();
     let send_task = tokio::spawn(async move {
         while let Some(msg) = outbound.recv().await {
-            if let Err(err) = conn_send.send_datagram(msg.payload.as_ref()) {
-                warn!(client_id = %send_client_id, error = %err, "datagram send failed");
-                break;
+            let payload = msg.payload;
+            let plan = glitch_out.plan_outbound("wt-relay").await;
+            match plan {
+                OutboundPlan::Drop => {}
+                OutboundPlan::Once | OutboundPlan::Twice => {
+                    if let Err(err) = conn_send.send_datagram(payload.as_ref()) {
+                        warn!(client_id = %send_client_id, error = %err, "datagram send failed");
+                        break;
+                    }
+                    if plan == OutboundPlan::Twice {
+                        glitch_out.duplicate_outbound_delay().await;
+                        if conn_send.send_datagram(payload.as_ref()).is_err() {
+                            break;
+                        }
+                    }
+                }
             }
         }
     });
 
     let mut buffer = vec![0u8; hub.max_payload_bytes()].into_boxed_slice();
+    let glitch_in = network_glitch;
 
     loop {
         tokio::select! {
             result = connection.receive_datagram() => {
                 match result {
                     Ok(dgram) => {
-                        hub.broadcast(&client_id, &room, Bytes::copy_from_slice(&dgram)).await;
+                        if glitch_in.impair_inbound().await {
+                            continue;
+                        }
+                        let payload = Bytes::copy_from_slice(&dgram);
+                        let hub_in = hub.clone();
+                        let cid = client_id.clone();
+                        let room_in = room.clone();
+                        hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                        if glitch_in.should_repeat_inbound().await {
+                            hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                        }
                     }
                     Err(err) => {
                         warn!(%client_id, error = %err, "datagram receive failed");
@@ -252,8 +333,18 @@ async fn handle_relay_session(
                     Ok((mut send, mut recv)) => {
                         match recv.read(&mut buffer).await {
                             Ok(Some(n)) => {
+                                if glitch_in.impair_inbound().await {
+                                    let _ = send.write_all(b"ok").await;
+                                    continue;
+                                }
                                 let payload = Bytes::copy_from_slice(&buffer[..n]);
-                                hub.broadcast(&client_id, &room, payload.clone()).await;
+                                let hub_in = hub.clone();
+                                let cid = client_id.clone();
+                                let room_in = room.clone();
+                                hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                                if glitch_in.should_repeat_inbound().await {
+                                    hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                                }
                                 let _ = send.write_all(b"ok").await;
                             }
                             Ok(None) => {}
@@ -274,12 +365,17 @@ async fn handle_relay_session(
                     Ok(mut recv) => {
                         match recv.read(&mut buffer).await {
                             Ok(Some(n)) => {
-                                hub.broadcast(
-                                    &client_id,
-                                    &room,
-                                    Bytes::copy_from_slice(&buffer[..n]),
-                                )
-                                .await;
+                                if glitch_in.impair_inbound().await {
+                                    continue;
+                                }
+                                let payload = Bytes::copy_from_slice(&buffer[..n]);
+                                let hub_in = hub.clone();
+                                let cid = client_id.clone();
+                                let room_in = room.clone();
+                                hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                                if glitch_in.should_repeat_inbound().await {
+                                    hub_in.broadcast(&cid, &room_in, payload.clone()).await;
+                                }
                             }
                             Ok(None) => {}
                             Err(err) => {

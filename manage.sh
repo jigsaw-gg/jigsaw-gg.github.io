@@ -65,12 +65,8 @@ elif [[ "$1" == "run-rust-server-local" ]]; then
     cd "$ROOT_DIRECTORY_FULL_PATH" || exit 1
 
     ROOT_ENV="$ROOT_DIRECTORY_FULL_PATH/.env"
-    SERVER_ENV="$ROOT_DIRECTORY_FULL_PATH/apps/server/.local.env"
     if [[ -f "$ROOT_ENV" ]]; then
         load_dotenv "$ROOT_ENV"
-    fi
-    if [[ -f "$SERVER_ENV" ]]; then
-        load_dotenv "$SERVER_ENV"
     fi
 
     CERT_DIR="$ROOT_DIRECTORY_FULL_PATH/apps/server/certs"

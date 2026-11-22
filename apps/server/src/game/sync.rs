@@ -9,6 +9,7 @@ use tracing::{Instrument, info, warn};
 use crate::game::framing::{FrameReader, encode_frame};
 use crate::game::room::PlayerOut;
 use crate::game::store::GameStore;
+use crate::network_glitch::{NetworkGlitch, OutboundPlan};
 use crate::otel;
 use crate::proto::game::v1::{
     ClientEnvelope, StreamFrame, StreamKind, TransportKind, stream_frame,
@@ -50,6 +51,7 @@ pub async fn handle_websocket_game(
     store: GameStore,
     game_id: String,
     player_id: String,
+    network_glitch: NetworkGlitch,
 ) {
     let span = otel::game_session_span("WebSocket.Play", &game_id, &player_id);
     async move {
@@ -84,21 +86,50 @@ pub async fn handle_websocket_game(
         }
 
         let mut reader = FrameReader::new();
+        let glitch_out = network_glitch.clone();
         let send_span = tracing::Span::current();
         let send_task = tokio::spawn(
             async move {
+                let mut broken = false;
                 loop {
+                    if broken {
+                        break;
+                    }
                     tokio::select! {
                         frame = input_rx.recv() => {
                             let Some(frame) = frame else { break; };
-                            if sink.send(Message::Binary(encode_frame(&frame))).await.is_err() {
-                                break;
+                            let bytes = encode_frame(&frame);
+                            let plan = glitch_out.plan_outbound("ws-game-input").await;
+                            match plan {
+                                OutboundPlan::Drop => {}
+                                OutboundPlan::Once | OutboundPlan::Twice => {
+                                    if sink.send(Message::Binary(bytes.clone())).await.is_err() {
+                                        broken = true;
+                                    } else if plan == OutboundPlan::Twice {
+                                        glitch_out.duplicate_outbound_delay().await;
+                                        if sink.send(Message::Binary(bytes)).await.is_err() {
+                                            broken = true;
+                                        }
+                                    }
+                                }
                             }
                         }
                         frame = world_rx.recv() => {
                             let Some(frame) = frame else { break; };
-                            if sink.send(Message::Binary(encode_frame(&frame))).await.is_err() {
-                                break;
+                            let bytes = encode_frame(&frame);
+                            let plan = glitch_out.plan_outbound("ws-game-world").await;
+                            match plan {
+                                OutboundPlan::Drop => {}
+                                OutboundPlan::Once | OutboundPlan::Twice => {
+                                    if sink.send(Message::Binary(bytes.clone())).await.is_err() {
+                                        broken = true;
+                                    } else if plan == OutboundPlan::Twice {
+                                        glitch_out.duplicate_outbound_delay().await;
+                                        if sink.send(Message::Binary(bytes)).await.is_err() {
+                                            broken = true;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -107,6 +138,7 @@ pub async fn handle_websocket_game(
             .instrument(send_span),
         );
 
+        let glitch_in = network_glitch;
         while let Some(Ok(message)) = stream.next().await {
             let payload = match message {
                 Message::Binary(b) => b,
@@ -118,10 +150,21 @@ pub async fn handle_websocket_game(
             loop {
                 match reader.next_frame() {
                     Ok(Some(frame)) => {
+                        if glitch_in.impair_inbound().await {
+                            continue;
+                        }
                         if let Some(env) = client_envelope_from_frame(&frame) {
                             store.touch_activity(&game_id);
                             if let Some(room) = store.room(&game_id) {
-                                room.push_input(&player_id, env).await;
+                                room.push_input(&player_id, env.clone()).await;
+                                let store_in = store.clone();
+                                let gid = game_id.clone();
+                                let pid = player_id.clone();
+                                if glitch_in.should_repeat_inbound().await {
+                                    if let Some(room) = store_in.room(&gid) {
+                                        room.push_input(&pid, env.clone()).await;
+                                    }
+                                }
                             }
                         }
                     }

@@ -76,6 +76,19 @@ Use `--release` when you need a fully optimized binary; during active developmen
 
 Useful env vars / flags: `HTTP_ADDR`, `WEBTRANSPORT_ADDR`, `PUBLIC_HOST`, `CERT_DIR`, `CERT_FILE`, `KEY_FILE`, `DEFAULT_ROOM`, `RUST_LOG`.
 
+### Network glitch (local lag testing)
+
+Optional application-level impairment on play `/game` frames and opaque relay traffic (`/ws`, WebTransport `/relay`). Lobby HTTP RPCs are untouched. Welcome on `/game` is never dropped (only subsequent frames).
+
+| Env                                | Default | Meaning                                                  |
+| ---------------------------------- | ------- | -------------------------------------------------------- |
+| `NETWORK_GLITCH_LATENCY_MS`        | `0`     | Mean one-way delay (ms)                                  |
+| `NETWORK_GLITCH_LATENCY_JITTER_MS` | `0`     | ± uniform jitter around the mean (ms); can reorder       |
+| `NETWORK_GLITCH_DROP_PERCENT`      | `0`     | Drop chance 0–100                                        |
+| `NETWORK_GLITCH_DUP_PERCENT`       | `0`     | Duplicate chance 0–100 (second send after another delay) |
+
+`./manage.sh run-rust-server-local` loads repo-root `.env` and optional `apps/server/.local.env`, so you can keep glitch knobs in `.local.env`.
+
 ## Transports (opaque pipes)
 
 ### WebSocket
