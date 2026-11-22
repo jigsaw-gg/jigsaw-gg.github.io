@@ -21,7 +21,7 @@ import {
   type Tick,
   type Welcome,
 } from './gen/game_pb.ts'
-import { event, withSpan } from '../otel/index.ts'
+import { event, setServerSessionElapsedMs, withSpan } from '../otel/index.ts'
 import { HEARTBEAT_INTERVAL_MS } from '../core/config.ts'
 import { dialPlayTransport, type PlayTransport } from './playTransport.ts'
 import type { PlayEndpoints, PieceStateJson } from './gameClient.ts'
@@ -72,6 +72,7 @@ export class GameSyncSession {
           onWorldFrame: (frame) => this.handleFrame(frame),
           onClose: (reason) => {
             this.stopHeartbeat()
+            setServerSessionElapsedMs(null)
             event('networking', 'game.play.close', {
               'jigsaw.game.id': this.gameId,
               'jigsaw.player.id': this.playerId,
@@ -278,6 +279,10 @@ export class GameSyncSession {
   }
 
   private dispatchServer(envelope: ServerEnvelope): void {
+    const sessionElapsedMs = Number(envelope.sessionElapsedMs)
+    if (Number.isFinite(sessionElapsedMs) && sessionElapsedMs >= 0) {
+      setServerSessionElapsedMs(sessionElapsedMs)
+    }
     switch (envelope.body.case) {
       case 'welcome': {
         const welcome = envelope.body.value

@@ -2,9 +2,11 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   getPlayTransport,
   getPuzzleSessionId,
+  getSessionTimeDisplay,
   otelConfigured,
   subscribePlayTransport,
   subscribePuzzleSessionId,
+  subscribeSessionTimeDisplay,
   TAB_ID,
 } from '../../otel/index.ts'
 
@@ -21,6 +23,11 @@ export function OtelDebugOverlay() {
   const transport = useSyncExternalStore(
     subscribePlayTransport,
     getPlayTransport,
+    () => null,
+  )
+  const sessionTimeLabel = useSyncExternalStore(
+    subscribeSessionTimeDisplay,
+    getSessionTimeDisplay,
     () => null,
   )
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -60,6 +67,7 @@ export function OtelDebugOverlay() {
     { key: 'tab', label: 'tab', value: TAB_ID },
     { key: 'session', label: 'session', value: sessionId },
     { key: 'transport', label: 'transport', value: transport },
+    { key: 'time', label: 'session time', value: sessionTimeLabel },
   ]
 
   return (

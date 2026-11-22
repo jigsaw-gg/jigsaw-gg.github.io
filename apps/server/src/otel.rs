@@ -10,7 +10,10 @@
 //! - Env set (possibly empty) → only listed categories
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::OnceLock;
+
+use dashmap::DashMap;
 
 use opentelemetry::KeyValue;
 use opentelemetry::trace::TracerProvider as _;
@@ -32,6 +35,38 @@ const ENABLED_FOR_ENV: &str = "OTEL_ENABLED_FOR";
 
 static SERVER_ID: OnceLock<String> = OnceLock::new();
 static ENABLED: OnceLock<EnabledCategories> = OnceLock::new();
+static GAME_SESSION_ELAPSED_MS: OnceLock<DashMap<String, AtomicI64>> = OnceLock::new();
+
+/// OTLP attribute mirror of `ServerEnvelope.session_elapsed_ms`.
+pub const SESSION_ELAPSED_MS_ATTR: &str = "jigsaw.session.elapsed_ms";
+
+fn game_session_elapsed_ms() -> &'static DashMap<String, AtomicI64> {
+    GAME_SESSION_ELAPSED_MS.get_or_init(DashMap::new)
+}
+
+/// Latest authoritative live-room clock for `game_id` (updated on every server envelope).
+pub fn touch_game_session_clock(game_id: &str, elapsed_ms: i64) {
+    if game_id.is_empty() {
+        return;
+    }
+    game_session_elapsed_ms()
+        .entry(game_id.to_string())
+        .or_insert_with(|| AtomicI64::new(0))
+        .store(elapsed_ms, Ordering::Relaxed);
+}
+
+pub fn clear_game_session_clock(game_id: &str) {
+    if game_id.is_empty() {
+        return;
+    }
+    game_session_elapsed_ms().remove(game_id);
+}
+
+fn session_elapsed_for_game(game_id: &str) -> Option<i64> {
+    game_session_elapsed_ms()
+        .get(game_id)
+        .map(|v| v.load(Ordering::Relaxed))
+}
 
 /// Reporting category for OTEL spans.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -171,6 +206,7 @@ pub fn unary_span(rpc: &'static str) -> Span {
             server_id = %server_id(),
             request_id = %Uuid::new_v4(),
             game_id = tracing::field::Empty,
+            jigsaw.session.elapsed_ms = tracing::field::Empty,
         )
     })
 }
@@ -178,14 +214,17 @@ pub fn unary_span(rpc: &'static str) -> Span {
 /// Span for a long-lived game play session (streaming / transport).
 pub fn game_session_span(rpc: &'static str, game_id: &str, player_id: &str) -> Span {
     span_for(Category::Networking, || {
-        tracing::info_span!(
+        let span = tracing::info_span!(
             "rpc.game_session",
             rpc,
             category = Category::Networking.as_str(),
             server_id = %server_id(),
             game_id = %game_id,
             player_id = %player_id,
-        )
+            jigsaw.session.elapsed_ms = tracing::field::Empty,
+        );
+        record_session_elapsed_for_game(game_id);
+        span
     })
 }
 
@@ -199,6 +238,7 @@ pub fn input_span(name: &'static str) -> Span {
             server_id = %server_id(),
             game_id = tracing::field::Empty,
             player_id = tracing::field::Empty,
+            jigsaw.session.elapsed_ms = tracing::field::Empty,
         )
     })
 }
@@ -213,6 +253,7 @@ pub fn piece_logic_span(name: &'static str) -> Span {
             server_id = %server_id(),
             game_id = tracing::field::Empty,
             player_id = tracing::field::Empty,
+            jigsaw.session.elapsed_ms = tracing::field::Empty,
         )
     })
 }
@@ -221,6 +262,13 @@ pub fn piece_logic_span(name: &'static str) -> Span {
 pub fn record_game_id(game_id: &str) {
     if !game_id.is_empty() {
         Span::current().record("game_id", game_id);
+        record_session_elapsed_for_game(game_id);
+    }
+}
+
+fn record_session_elapsed_for_game(game_id: &str) {
+    if let Some(ms) = session_elapsed_for_game(game_id) {
+        Span::current().record(SESSION_ELAPSED_MS_ATTR, ms);
     }
 }
 

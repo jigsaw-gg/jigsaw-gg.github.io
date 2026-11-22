@@ -62,6 +62,7 @@ pub struct RoomState {
     tick_id: u64,
     server_seq: u64,
     empty_since: Option<Instant>,
+    session_started_at: Instant,
 }
 
 impl RoomState {
@@ -82,7 +83,12 @@ impl RoomState {
             tick_id: 0,
             server_seq: 0,
             empty_since: None,
+            session_started_at: Instant::now(),
         }
+    }
+
+    fn session_elapsed_ms(&self) -> i64 {
+        self.session_started_at.elapsed().as_millis() as i64
     }
 
     pub fn snapshot_players(&self) -> Vec<PlayerInfo> {
@@ -123,10 +129,13 @@ impl RoomState {
     }
 
     fn server_envelope(&mut self, body: server_envelope::Body) -> ServerEnvelope {
+        let session_elapsed_ms = self.session_elapsed_ms();
+        otel::touch_game_session_clock(&self.game_id, session_elapsed_ms);
         ServerEnvelope {
             game_id: self.game_id.clone(),
             seq: self.next_seq(),
             server_time_ms: now_ms(),
+            session_elapsed_ms,
             body: Some(body),
         }
     }
@@ -309,6 +318,7 @@ async fn run_sim(
             }
         }
     }
+    otel::clear_game_session_clock(&game_id);
     info!(%game_id, "room sim stopped");
 }
 

@@ -5,7 +5,10 @@ import { PuzzleBoard } from '../board/puzzleTable/index.ts'
 import { localizeError } from '../i18n/errors.ts'
 import { useI18n } from '../i18n/useI18n.ts'
 import type { Messages } from '../i18n/types.ts'
-import { setPuzzleSessionId } from '../../otel/index.ts'
+import {
+  setPuzzleSessionId,
+  setServerSessionElapsedMs,
+} from '../../otel/index.ts'
 import {
   clearConfirmedPlayerName,
   normalizePlayerName,
@@ -172,7 +175,10 @@ function PlaySession({
   const [playerId] = useState(readPlayerId)
   useEffect(() => {
     setPuzzleSessionId(sessionId)
-    return () => setPuzzleSessionId(null)
+    return () => {
+      setPuzzleSessionId(null)
+      setServerSessionElapsedMs(null)
+    }
   }, [sessionId])
   const session = useGameSession(sessionId, {
     id: playerId,

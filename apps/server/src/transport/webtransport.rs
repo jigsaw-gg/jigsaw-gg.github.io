@@ -101,6 +101,7 @@ async fn handle_game_session(
         .await
         .map_err(|e| anyhow::anyhow!(e))?;
 
+        otel::record_game_id(&game_id);
         info!(%game_id, %player_id, "WebTransport /game connected — waiting for input+world streams");
 
         // Expect two bidirectional streams; role from first frame StreamKind (or order).

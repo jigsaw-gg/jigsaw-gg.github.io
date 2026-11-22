@@ -73,6 +73,7 @@ pub async fn handle_websocket_game(
         };
 
         info!(%game_id, %player_id, "websocket /game connected");
+        otel::record_game_id(&game_id);
 
         if sink
             .send(Message::Binary(encode_frame(&welcome)))

@@ -400,6 +400,10 @@ message ServerEnvelope {
   string game_id = 1;
   uint64 seq = 2;
   int64 server_time_ms = 3;
+  // Elapsed milliseconds since the live play room was created (authoritative
+  // session clock). Present on every server envelope; use for debug overlay
+  // and correlated OTEL (`jigsaw.session.elapsed_ms`).
+  int64 session_elapsed_ms = 4;
   oneof body {
     Welcome welcome = 10;
     Tick tick = 11;
