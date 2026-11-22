@@ -1,8 +1,6 @@
 mod config;
 mod game;
-mod grpc;
 mod hub;
-mod netsim;
 mod otel;
 mod proto;
 mod tls;
@@ -11,9 +9,7 @@ mod transport;
 use crate::config::Config;
 use crate::game::GameStore;
 use crate::hub::Hub;
-use crate::netsim::NetSim;
 use crate::tls::ensure_dev_certs;
-use crate::transport::webrtc::WebRtcManager;
 use clap::Parser;
 use tracing::info;
 
@@ -26,7 +22,6 @@ async fn main() -> anyhow::Result<()> {
     let provider = otel::init_tracing().map_err(|e| anyhow::anyhow!(e))?;
 
     let config = Config::parse();
-    let net_sim = NetSim::from_config(&config)?;
     let tls = ensure_dev_certs(
         &config.cert_dir,
         &config.public_host,
@@ -35,18 +30,12 @@ async fn main() -> anyhow::Result<()> {
     )?;
     let hub = Hub::new(&config);
     let games = GameStore::new();
-    // Transport pipe retained; SDP/ICE setup is not a relay.v1 RPC anymore.
-    let _webrtc = WebRtcManager::new(hub.clone(), config.webrtc_udp_addr);
 
     info!(
         server_id = %otel::server_id(),
         http = %config.http_addr,
-        grpc = %config.grpc_addr,
-        tcp = %config.tcp_addr,
         webtransport = %config.webtransport_addr,
-        udp = %config.udp_addr,
-        webrtc_udp = %config.webrtc_udp_addr,
-        "starting jigsaw-gg-server (transports + RPC)"
+        "starting jigsaw-gg-server"
     );
 
     let http_hub = hub.clone();
@@ -66,24 +55,9 @@ async fn main() -> anyhow::Result<()> {
         transport::webtransport::serve(wt_addr, wt_hub, wt_games, wt_tls, wt_host).await
     });
 
-    let tcp_hub = hub.clone();
-    let tcp_addr = config.tcp_addr;
-    let tcp = tokio::spawn(async move { transport::tcp::serve(tcp_addr, tcp_hub).await });
-
-    let udp_hub = hub.clone();
-    let udp_addr = config.udp_addr;
-    let udp = tokio::spawn(async move { transport::udp::serve(udp_addr, udp_hub, net_sim).await });
-
-    let grpc_addr = config.grpc_addr;
-    let grpc_games = games.clone();
-    let grpc = tokio::spawn(async move { grpc::serve(grpc_addr, grpc_games).await });
-
     let result = tokio::select! {
         res = http => res.map_err(|e| anyhow::anyhow!(e)).and_then(|r| r),
         res = webtransport => res.map_err(|e| anyhow::anyhow!(e)).and_then(|r| r),
-        res = tcp => res.map_err(|e| anyhow::anyhow!(e)).and_then(|r| r),
-        res = udp => res.map_err(|e| anyhow::anyhow!(e)).and_then(|r| r),
-        res = grpc => res.map_err(|e| anyhow::anyhow!(e)).and_then(|r| r),
     };
 
     if let Some(provider) = provider

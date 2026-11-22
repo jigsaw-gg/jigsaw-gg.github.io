@@ -31,15 +31,11 @@ USER relay
 
 ENV RUST_LOG=info \
     HTTP_ADDR=0.0.0.0:21100 \
-    GRPC_ADDR=0.0.0.0:21101 \
-    TCP_ADDR=0.0.0.0:21102 \
     WEBTRANSPORT_ADDR=0.0.0.0:31100 \
-    UDP_ADDR=0.0.0.0:31101 \
-    WEBRTC_UDP_ADDR=0.0.0.0:31102 \
     PUBLIC_HOST=127.0.0.1 \
     CERT_DIR=/app/certs \
     DEFAULT_ROOM=default
 
-EXPOSE 21100/tcp 21101/tcp 21102/tcp 31100/udp 31101/udp 31102/udp
+EXPOSE 21100/tcp 31100/udp
 
 ENTRYPOINT ["jigsaw-gg-server"]

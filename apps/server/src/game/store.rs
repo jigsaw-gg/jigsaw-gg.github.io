@@ -1,6 +1,6 @@
 //! Shared in-memory game definitions + live rooms.
 //!
-//! One [`GameStore`] is cloned into every transport / gRPC service so all
+//! One [`GameStore`] is cloned into every HTTP / play transport task so all
 //! clients observe the same authoritative state.
 
 use std::sync::Arc;

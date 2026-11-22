@@ -1,40 +1,36 @@
 # jigsaw-gg-server
 
-Multi-transport game sync + opaque byte relay in Rust. Lives in the **jigsaw-gg monorepo** at `apps/server/`.
+WebTransport + WebSocket game sync in Rust. Lives in the **jigsaw-gg monorepo** at `apps/server/`.
 
 - Agent / contributor guide: [`../../AGENTS.md`](../../AGENTS.md)
 - Monorepo overview: [`../../README.md`](../../README.md)
 
 ## Architecture
 
-**Transports** are opaque pipes (bytes in / bytes out):
+**Transports** are opaque pipes (bytes in / bytes out) or length-prefixed `game.v1` play streams:
 
-| Transport               | Role                                            |
-| ----------------------- | ----------------------------------------------- |
-| **WebTransport** (QUIC) | Primary low-latency pipe                        |
-| **WebSocket**           | TCP fallback pipe                               |
-| **WebRTC DataChannel**  | Browser DC pipe (setup not in proto; see below) |
-| **Raw TCP / UDP**       | Simple socket pipes                             |
+| Transport               | Role                     |
+| ----------------------- | ------------------------ |
+| **WebTransport** (QUIC) | Primary low-latency pipe |
+| **WebSocket**           | TCP fallback pipe        |
 
-**Protos** define application RPCs and framed play messages — not the transports themselves:
+**Protos** define application RPCs and framed play messages:
 
 | Proto                                          | RPCs                                                  |
 | ---------------------------------------------- | ----------------------------------------------------- |
 | [`proto/game.proto`](../../proto/game.proto)   | `GameSession` lobby + `GameSync.Play` / `StreamFrame` |
 | [`proto/relay.proto`](../../proto/relay.proto) | `RelayControl.Ping` only                              |
 
-Unary RPCs are reachable over **HTTP `:21100`** (browser) and **gRPC `:21101`**. Play frames ride WebTransport `/game` or WebSocket `/game` (length-prefixed `StreamFrame`). Opaque peer relay uses `/ws`, `/relay`, TCP, or UDP without protobuf.
+Unary RPCs are on **HTTP `:21100`** (browser). Play frames ride WebTransport `/game` or WebSocket `/game` (length-prefixed `StreamFrame`). Opaque peer relay uses `/ws` and `/relay` on the same ports.
 
 ## Ports
 
-| Port    | Proto | Service                                  |
-| ------- | ----- | ---------------------------------------- |
-| `21100` | TCP   | HTTP RPCs + WebSocket transport          |
-| `21101` | TCP   | gRPC (`Ping`, `GameSession`, `GameSync`) |
-| `21102` | TCP   | Raw TCP transport                        |
-| `31100` | UDP   | WebTransport (QUIC)                      |
-| `31101` | UDP   | Raw UDP transport                        |
-| `31102` | UDP   | WebRTC ICE / DataChannel                 |
+| Port    | Proto | Service                         |
+| ------- | ----- | ------------------------------- |
+| `21100` | TCP   | HTTP RPCs + WebSocket transport |
+| `31100` | UDP   | WebTransport (QUIC)             |
+
+The Vite client uses `VITE_GAME_HTTP_URL`, `VITE_GAME_WEBSOCKET_URL`, and `VITE_GAME_WEBTRANSPORT_URL` (defaults `http://127.0.0.1:21100`, `ws://127.0.0.1:21100`, `https://127.0.0.1:31100`).
 
 ## Quick start (Docker Compose)
 
@@ -44,19 +40,15 @@ From the **monorepo root** (not `apps/server/`):
 docker compose up --build
 ```
 
-Uses optional repo-root **`.docker.env`**, `apps/server/certs/`, and the same ports as `./manage.sh run-rust-server-local`. No network-simulation flags in compose.
+Uses optional repo-root **`.docker.env`**, `apps/server/certs/`, and the same ports as `./manage.sh run-rust-server-local`.
 
-On Docker Desktop (macOS/Windows), published **UDP** ports can be unreliable from the host; TCP/WebSocket/gRPC work normally. Prefer `cargo run` for local UDP/WebTransport bring-up.
+On Docker Desktop (macOS/Windows), published **UDP** ports can be unreliable from the host; TCP/WebSocket work normally. Prefer `cargo run` for local WebTransport bring-up.
 
 Endpoints:
 
 - `ws://127.0.0.1:21100/ws` — WebSocket opaque relay
 - `https://127.0.0.1:31100/relay` — WebTransport opaque relay (self-signed cert in `certs/`)
 - `http://127.0.0.1:21100/` — browser unary RPCs (`GameSession` + `Ping`)
-- `127.0.0.1:21101` — gRPC
-- `127.0.0.1:21102` — raw TCP
-- `127.0.0.1:31101` — raw UDP
-- `127.0.0.1:31102` — WebRTC UDP
 
 Health check: `GET http://127.0.0.1:21100/healthz`
 
@@ -76,27 +68,7 @@ Direct Cargo (same manifest):
 cargo run --manifest-path apps/server/Cargo.toml --release
 ```
 
-Useful env vars / flags: `HTTP_ADDR`, `GRPC_ADDR`, `TCP_ADDR`, `WEBTRANSPORT_ADDR`, `UDP_ADDR`, `WEBRTC_UDP_ADDR`, `PUBLIC_HOST`, `CERT_DIR`, `CERT_FILE`, `KEY_FILE`, `DEFAULT_ROOM`, `RUST_LOG`.
-
-### UDP network simulation
-
-Impair the raw UDP relay (`:31101`) for local lag testing. JOIN datagrams are never dropped/delayed.
-
-| Flag / env                                          | Default | Meaning                                            |
-| --------------------------------------------------- | ------- | -------------------------------------------------- |
-| `--net-latency-ms` / `NET_LATENCY_MS`               | `0`     | Mean one-way delay (ms)                            |
-| `--net-latency-jitter-ms` / `NET_LATENCY_JITTER_MS` | `0`     | ± uniform jitter around the mean (ms); can reorder |
-| `--net-udp-drop-percent` / `NET_UDP_DROP_PERCENT`   | `0`     | Drop chance 0–100                                  |
-| `--net-udp-dup-percent` / `NET_UDP_DUP_PERCENT`     | `0`     | Duplicate chance 0–100                             |
-
-Example (~80 ms RTT with jitter and 2 % loss):
-
-```bash
-./manage.sh run-rust-server-local -- \
-  --net-latency-ms 40 \
-  --net-latency-jitter-ms 15 \
-  --net-udp-drop-percent 2
-```
+Useful env vars / flags: `HTTP_ADDR`, `WEBTRANSPORT_ADDR`, `PUBLIC_HOST`, `CERT_DIR`, `CERT_FILE`, `KEY_FILE`, `DEFAULT_ROOM`, `RUST_LOG`.
 
 ## Transports (opaque pipes)
 
@@ -107,26 +79,6 @@ Connect to `/ws?room=default&client_id=<optional>`. Binary (or text) frames are 
 ### WebTransport
 
 Connect to `/relay?room=default&client_id=<optional>`. Datagrams and uni/bi streams carry arbitrary payloads. Outbound fan-out prefers datagrams.
-
-### WebRTC
-
-DataChannel bytes are relayed like other transports once a peer connection exists. SDP/ICE setup is **transport plumbing**, not a `relay.v1` RPC (Signal was removed). Reintroduce a non-proto setup path when browser WebRTC bring-up is needed.
-
-### Raw TCP
-
-Length-prefixed frames: `u32 BE length` + payload. Optional first frame (UTF-8):
-
-```text
-JOIN <room> [client_id]
-```
-
-### Raw UDP
-
-One datagram = one payload. Peers are keyed by source address. Optional first datagram:
-
-```text
-JOIN <room> [client_id]
-```
 
 ## Browser HTTP API (`:21100`)
 
@@ -153,15 +105,9 @@ curl -s http://127.0.0.1:21100/game.v1.GameSession/CreateGame \
 
 Add `"rotationEnabled": true` to `setup` to deal every piece a random quarter turn and let players turn the groups they hold (`RotateHeld` on the play stream). It defaults to `false`.
 
-## gRPC surface (`:21101`)
+## Play transports
 
-- `relay.v1.RelayControl.Ping`
-- `game.v1.GameSession` — Create / Get / Join / Leave
-- `game.v1.GameSync.Play` — multiplexed `StreamFrame` bidi
-
-Play transports (same in-memory room for every client). JoinGame returns
-**path + query only** (`webtransportPath` / `websocketPath`); the client
-resolves them against its own WT/WS base URLs:
+JoinGame returns **path + query only** (`webtransportPath` / `websocketPath`); the client resolves them against its own WT/WS base URLs:
 
 - WebTransport `/game?game_id=…&player_id=…` — two QUIC bidi streams (input + world)
 - WebSocket `/game?game_id=…&player_id=…` — single multiplexed pipe
@@ -175,10 +121,9 @@ Games live in process memory with a **24h inactivity TTL**.
   ─────────────────               ─────────────────────
   WebSocket /ws  ──┐
   WebTransport     ├── Hub ──── opaque peer broadcast
-  TCP / UDP  ──────┘
+  /relay       ────┘
 
   HTTP :21100  ──── GameSession + Ping
-  gRPC :21101  ──── GameSession + GameSync.Play + Ping
 
   WT /game  ─────── length-prefixed StreamFrame (game.v1)
   WS /game  ─────── length-prefixed StreamFrame (game.v1)

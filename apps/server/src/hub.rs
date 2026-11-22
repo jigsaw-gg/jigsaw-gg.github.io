@@ -12,20 +12,14 @@ pub type RoomId = String;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransportKind {
     WebTransport,
-    WebRtc,
     WebSocket,
-    Tcp,
-    Udp,
 }
 
 impl TransportKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::WebTransport => "webtransport",
-            Self::WebRtc => "webrtc",
             Self::WebSocket => "websocket",
-            Self::Tcp => "tcp",
-            Self::Udp => "udp",
         }
     }
 }

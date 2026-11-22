@@ -7,12 +7,12 @@ option java_multiple_files = true;
 // =============================================================================
 // Architecture
 //
-// WebTransport / WebSocket / WebRTC / TCP / UDP are *transports* — opaque pipes
-// that carry bytes (or framed StreamFrames for game play). They are not RPCs.
+// WebTransport / WebSocket are *transports* — opaque pipes that carry bytes
+// (or framed StreamFrames for game play). They are not RPCs.
 //
 // This package defines the only remaining relay-plane RPC. Application RPCs
-// live in `game.v1` and are served over HTTP (:21100) / gRPC (:21101), while
-// play streams ride the transports above.
+// live in `game.v1` and are served over HTTP (:21100); play streams ride
+// WebTransport or WebSocket `/game`.
 // =============================================================================
 
 service RelayControl {

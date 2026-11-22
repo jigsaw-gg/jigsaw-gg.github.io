@@ -1,6 +1,6 @@
 //! Authoritative game sync (`game.v1`).
 //!
-//! All transports (gRPC, WebTransport `/game`, WebSocket `/game`) share one
+//! All play transports (WebTransport `/game`, WebSocket `/game`) share one
 //! in-memory [`store::GameStore`] so independently connected clients see the
 //! same definition and live room state.
 
@@ -9,13 +9,11 @@ mod grid;
 mod motion;
 mod room;
 mod rotation;
-mod session;
 mod store;
 pub mod sync;
 
-pub use session::GameSessionService;
 pub use store::{GameStore, StoreError};
-pub use sync::{GameSyncService, handle_websocket_game};
+pub use sync::handle_websocket_game;
 
 pub mod constants {
     use std::time::Duration;

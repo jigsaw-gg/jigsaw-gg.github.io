@@ -26,8 +26,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let mut builder = tonic_prost_build::configure()
-        .build_server(true)
-        .build_client(true);
+        .build_server(false)
+        .build_client(false);
 
     for path in unary_messages {
         builder = builder

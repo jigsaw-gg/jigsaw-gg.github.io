@@ -1,146 +1,18 @@
-//! Play transports: gRPC `GameSync.Play`, WebSocket `/game`, WebTransport `/game`.
-
-use std::pin::Pin;
+//! Play transports: WebSocket `/game`, WebTransport `/game`.
 
 use axum::extract::ws::{Message, WebSocket};
 use bytes::Bytes;
-use futures_util::{SinkExt, Stream, StreamExt};
+use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Request, Response, Status, Streaming};
 use tracing::{Instrument, info, warn};
 
 use crate::game::framing::{FrameReader, encode_frame};
 use crate::game::room::PlayerOut;
 use crate::game::store::GameStore;
 use crate::otel;
-use crate::proto::game::v1::game_sync_server::GameSync;
 use crate::proto::game::v1::{
-    ClientEnvelope, StreamFrame, StreamKind, TransportKind, client_envelope, stream_frame,
+    ClientEnvelope, StreamFrame, StreamKind, TransportKind, stream_frame,
 };
-
-pub struct GameSyncService {
-    store: GameStore,
-}
-
-impl GameSyncService {
-    pub fn new(store: GameStore) -> Self {
-        Self { store }
-    }
-}
-
-type PlayOutStream = Pin<Box<dyn Stream<Item = Result<StreamFrame, Status>> + Send>>;
-
-#[tonic::async_trait]
-impl GameSync for GameSyncService {
-    type PlayStream = PlayOutStream;
-
-    async fn play(
-        &self,
-        request: Request<Streaming<StreamFrame>>,
-    ) -> Result<Response<Self::PlayStream>, Status> {
-        let mut inbound = request.into_inner();
-        let (out_tx, out_rx) = mpsc::channel::<Result<StreamFrame, Status>>(256);
-
-        // Peek first client frame for identity.
-        let first = inbound
-            .next()
-            .await
-            .ok_or_else(|| Status::invalid_argument("empty play stream"))?
-            .map_err(|e| Status::cancelled(e.to_string()))?;
-
-        let (game_id, player_id, display_name) = identity_from_frame(&first).ok_or_else(|| {
-            Status::invalid_argument("first frame must carry ClientEnvelope with ids")
-        })?;
-
-        let session_span = otel::game_session_span("GameSync.Play", &game_id, &player_id);
-        async {
-            let (input_tx, mut input_rx) = mpsc::channel::<StreamFrame>(128);
-            let (world_tx, mut world_rx) = mpsc::channel::<StreamFrame>(128);
-
-            let store = self.store.clone();
-            let out = PlayerOut {
-                input_tx,
-                world_tx,
-                dual_bidi: false,
-                transport: TransportKind::Websocket,
-            };
-
-            let welcome = match store
-                .attach_player(&game_id, &player_id, &display_name, out)
-                .await
-            {
-                Ok((_, _, welcome)) => welcome,
-                Err(err) => {
-                    return Err(Status::failed_precondition(err.message()));
-                }
-            };
-
-            if out_tx.send(Ok(welcome)).await.is_err() {
-                return Err(Status::cancelled("client gone"));
-            }
-
-            // Merge input/world → single gRPC outbound.
-            let merge_tx = out_tx.clone();
-            let merge_span = tracing::Span::current();
-            tokio::spawn(
-                async move {
-                    loop {
-                        tokio::select! {
-                            frame = input_rx.recv() => {
-                                match frame {
-                                    Some(f) => { if merge_tx.send(Ok(f)).await.is_err() { break; } }
-                                    None => break,
-                                }
-                            }
-                            frame = world_rx.recv() => {
-                                match frame {
-                                    Some(f) => { if merge_tx.send(Ok(f)).await.is_err() { break; } }
-                                    None => break,
-                                }
-                            }
-                        }
-                    }
-                }
-                .instrument(merge_span),
-            );
-
-            // Process first + remaining frames.
-            let room = store.room(&game_id);
-            let store_touch = store.clone();
-            let gid = game_id.clone();
-            let pid = player_id.clone();
-            let inbound_span = tracing::Span::current();
-            tokio::spawn(
-                async move {
-                    if let Some(env) = client_envelope_from_frame(&first) {
-                        store_touch.touch_activity(&gid);
-                        if let Some(room) = &room {
-                            room.push_input(&pid, env).await;
-                        }
-                    }
-                    while let Some(Ok(frame)) = inbound.next().await {
-                        if let Some(env) = client_envelope_from_frame(&frame) {
-                            store_touch.touch_activity(&gid);
-                            if let Some(room) = store_touch.room(&gid) {
-                                room.push_input(&pid, env).await;
-                            }
-                        }
-                    }
-                    if let Some(room) = store_touch.room(&gid) {
-                        room.detach(&pid, false).await;
-                    }
-                }
-                .instrument(inbound_span),
-            );
-
-            let out: Self::PlayStream = Box::pin(ReceiverStream::new(out_rx));
-            Ok(Response::new(out))
-        }
-        .instrument(session_span)
-        .await
-    }
-}
 
 /// Shared attach path used by WebSocket and WebTransport play handlers.
 pub async fn attach_play_session(
@@ -269,18 +141,6 @@ pub async fn handle_websocket_game(
     }
     .instrument(span)
     .await
-}
-
-fn identity_from_frame(frame: &StreamFrame) -> Option<(String, String, String)> {
-    let env = client_envelope_from_frame(frame)?;
-    if env.game_id.is_empty() || env.player_id.is_empty() {
-        return None;
-    }
-    let display = match &env.body {
-        Some(client_envelope::Body::Rename(r)) => r.display_name.clone(),
-        _ => String::new(),
-    };
-    Some((env.game_id, env.player_id, display))
 }
 
 pub fn client_envelope_from_frame(frame: &StreamFrame) -> Option<ClientEnvelope> {

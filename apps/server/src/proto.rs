@@ -1,4 +1,4 @@
-//! Generated gRPC / protobuf types.
+//! Generated protobuf types (prost via tonic-build).
 
 pub mod relay {
     pub mod v1 {

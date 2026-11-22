@@ -17,7 +17,7 @@ option java_multiple_files = true;
 // `GameSync.Play` is the logical bidi contract those streams implement; on
 // WebTransport the two streams carry the same messages partitioned by
 // StreamFrame.stream (see StreamKind). Fallbacks (WebSocket bidi, or a single
-// Connect/gRPC Play RPC over TCP) multiplex both kinds on one bidi pipe.
+// WebSocket `/game`) multiplex both kinds on one bidi pipe.
 //
 // Host ownership: the **client** configures scheme/host/port for play
 // WebTransport and WebSocket (env / build). JoinGame's PlayEndpoints carry
@@ -27,7 +27,7 @@ option java_multiple_files = true;
 // =============================================================================
 
 // ---------------------------------------------------------------------------
-// Lobby / durable game definition (unary RPCs over Connect/gRPC HTTP).
+// Lobby / durable game definition (unary RPCs over HTTP :21100).
 // Source of truth for CreateGame lives on the server with GAME_TTL (24h of
 // inactivity). expires_at advances on Create/Join/heartbeat/accepted play input.
 // Live play rooms are separate: JoinGame creates the in-memory room if missing.
