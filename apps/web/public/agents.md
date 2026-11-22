@@ -1,6 +1,6 @@
 # Jigsaw GG — notes for agents
 
-> Product-facing summary for AI agents browsing https://jigsaw-gg.github.io/ (not the repository coding guide).
+> Product-facing summary for AI agents browsing https://jigsaw-gg.github.io/ (not the repository coding guide — that is `AGENTS.md` at the monorepo root on GitHub).
 
 ## What this site is
 

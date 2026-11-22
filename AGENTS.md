@@ -17,6 +17,26 @@ There is no test runner. For a UI change, run the dev server and use the page.
 
 - Local game server: `./manage.sh run-rust-server-local` (loads repo-root `.env`, then `apps/server/.local.env` when present; needs mkcert files in `apps/server/certs/`)
 - Regenerate TS protos: `./manage.sh gen-proto` or `npm run gen:proto`
+- Docker game server (repo root): `docker compose up --build` (optional `.docker.env` for container OTLP; see root `README.md`)
+
+## Repository layout
+
+| Path           | Role                                                                                                                        |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/`    | Vite + React client — [apps/web/AGENTS.md](apps/web/AGENTS.md); `public/agents.md` is the live-site LLM page                |
+| `apps/server/` | Rust `jigsaw-gg-server` crate — [server README](apps/server/README.md); thin [apps/server/AGENTS.md](apps/server/AGENTS.md) |
+| `proto/`       | Canonical `.proto` sources (TS via `buf`, Rust via `apps/server/build.rs`)                                                  |
+| `manage.sh`    | `gen-proto`, `run-rust-server-local`, `pre-commit`, …                                                                       |
+
+Deployed **product** notes for crawlers (`/agents.md` on GitHub Pages) live in `apps/web/public/agents.md` — not this file.
+
+## Environment files
+
+| File                     | Consumers                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `.env` (repo root)       | Vite (`envDir` in `apps/web/vite.config.ts`), `./manage.sh run-rust-server-local` |
+| `apps/server/.local.env` | Optional extra exports for `cargo run` (loaded after `.env`)                      |
+| `.docker.env`            | `docker compose` only (e.g. OTLP via `host.docker.internal`)                      |
 
 ## Source packages
 
@@ -180,7 +200,7 @@ Client config (local `.env` or Pages variables):
 
 Edit protos under `proto/`, then `./manage.sh gen-proto` (or `npm run gen:proto`) to refresh `apps/web/src/network/gen/*_pb.ts`; `cargo build` in `apps/server` picks up the same files via `build.rs`.
 
-A worktree may copy `.env` from the main checkout via `scripts/setup-worktree.sh`. Vite reads that file via `envDir` at the repo root (`apps/web/vite.config.ts`). Point `VITE_GAME_*` at a running local server (`./manage.sh run-rust-server-local`; client fallbacks are `127.0.0.1:21100` / `:31100` when unset).
+A worktree may copy `.env` from the main checkout via `scripts/setup-worktree.sh`. Point `VITE_GAME_*` at a running local server (`./manage.sh run-rust-server-local` or `docker compose up`; client fallbacks are `127.0.0.1:21100` / `:31100` when unset). Server runtime details: [apps/server/README.md](apps/server/README.md).
 
 ## Puzzle sessions
 
@@ -206,6 +226,8 @@ Web invites stay on GitHub Pages for link previews. The play page also shows a c
 
 ## GitHub Pages
 
-`base` in `vite.config.ts` stays `/`. The build copies `dist/index.html` to `dist/404.html` so `/network` and other SPA paths survive a refresh, and copies it to `dist/play/index.html` and `dist/about/index.html` so `/play/?id=…` and `/about` are real files (200 for crawlers / Telegram). `/` is the new-puzzle form, and `/puzzles` redirects there.
+`base` in `apps/web/vite.config.ts` stays `/`. Production build output is `apps/web/dist/`. The build copies `index.html` to `404.html` so `/network` and other SPA paths survive a refresh, and duplicates it under `play/index.html` and `about/index.html` so `/play/?id=…` and `/about` are real files (200 for crawlers / Telegram). `/` is the new-puzzle form, and `/puzzles` redirects there. CI uploads `apps/web/dist` (no Rust build).
+
+Set repository `VITE_GAME_*` variables for production; unset vars fall back to `127.0.0.1` in the client bundle.
 
 If `actions/deploy-pages` returns 404, turn Pages on in the repository settings and set the source to GitHub Actions. The workflow cannot enable Pages itself.

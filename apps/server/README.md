@@ -1,6 +1,9 @@
 # jigsaw-gg-server
 
-Multi-transport game sync + opaque byte relay in Rust.
+Multi-transport game sync + opaque byte relay in Rust. Lives in the **jigsaw-gg monorepo** at `apps/server/`.
+
+- Agent / contributor guide: [`../../AGENTS.md`](../../AGENTS.md)
+- Monorepo overview: [`../../README.md`](../../README.md)
 
 ## Architecture
 
@@ -15,10 +18,10 @@ Multi-transport game sync + opaque byte relay in Rust.
 
 **Protos** define application RPCs and framed play messages — not the transports themselves:
 
-| Proto                                    | RPCs                                                  |
-| ---------------------------------------- | ----------------------------------------------------- |
-| [`proto/game.proto`](proto/game.proto)   | `GameSession` lobby + `GameSync.Play` / `StreamFrame` |
-| [`proto/relay.proto`](proto/relay.proto) | `RelayControl.Ping` only                              |
+| Proto                                          | RPCs                                                  |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| [`proto/game.proto`](../../proto/game.proto)   | `GameSession` lobby + `GameSync.Play` / `StreamFrame` |
+| [`proto/relay.proto`](../../proto/relay.proto) | `RelayControl.Ping` only                              |
 
 Unary RPCs are reachable over **HTTP `:21100`** (browser) and **gRPC `:21101`**. Play frames ride WebTransport `/game` or WebSocket `/game` (length-prefixed `StreamFrame`). Opaque peer relay uses `/ws`, `/relay`, TCP, or UDP without protobuf.
 
@@ -41,7 +44,7 @@ From the **monorepo root** (not `apps/server/`):
 docker compose up --build
 ```
 
-Uses repo-root `.env`, optional `apps/server/.local.env`, and `apps/server/certs/` (same as `./manage.sh run-rust-server-local`). No network-simulation flags.
+Uses optional repo-root **`.docker.env`**, `apps/server/certs/`, and the same ports as `./manage.sh run-rust-server-local`. No network-simulation flags in compose.
 
 On Docker Desktop (macOS/Windows), published **UDP** ports can be unreliable from the host; TCP/WebSocket/gRPC work normally. Prefer `cargo run` for local UDP/WebTransport bring-up.
 
@@ -59,12 +62,21 @@ Health check: `GET http://127.0.0.1:21100/healthz`
 
 ## Local cargo run
 
+From the **monorepo root** (preferred):
+
 ```bash
-# requires protoc
-cargo run --release
+./manage.sh run-rust-server-local
 ```
 
-Useful env vars / flags: `HTTP_ADDR`, `GRPC_ADDR`, `TCP_ADDR`, `WEBTRANSPORT_ADDR`, `UDP_ADDR`, `WEBRTC_UDP_ADDR`, `PUBLIC_HOST`, `CERT_DIR`, `DEFAULT_ROOM`, `RUST_LOG`.
+Loads `.env`, optional `apps/server/.local.env`, and mkcert paths under `apps/server/certs/`.
+
+Direct Cargo (same manifest):
+
+```bash
+cargo run --manifest-path apps/server/Cargo.toml --release
+```
+
+Useful env vars / flags: `HTTP_ADDR`, `GRPC_ADDR`, `TCP_ADDR`, `WEBTRANSPORT_ADDR`, `UDP_ADDR`, `WEBRTC_UDP_ADDR`, `PUBLIC_HOST`, `CERT_DIR`, `CERT_FILE`, `KEY_FILE`, `DEFAULT_ROOM`, `RUST_LOG`.
 
 ### UDP network simulation
 
@@ -80,7 +92,7 @@ Impair the raw UDP relay (`:31101`) for local lag testing. JOIN datagrams are ne
 Example (~80 ms RTT with jitter and 2 % loss):
 
 ```bash
-cargo run --release -- \
+./manage.sh run-rust-server-local -- \
   --net-latency-ms 40 \
   --net-latency-jitter-ms 15 \
   --net-udp-drop-percent 2

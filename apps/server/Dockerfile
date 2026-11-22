@@ -24,7 +24,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --create-home --uid 10001 relay
 
-COPY --from=builder /build/apps/server/target/release/jigsaw-gg-server /usr/local/bin/jigsaw-gg-server
+COPY --from=builder /build/target/release/jigsaw-gg-server /usr/local/bin/jigsaw-gg-server
 
 RUN mkdir -p /app/certs && chown -R relay:relay /app
 USER relay

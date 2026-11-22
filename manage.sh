@@ -55,6 +55,11 @@ elif [[ "$1" == "gen-proto" ]]; then
     bash "$ROOT_DIRECTORY_FULL_PATH/scripts/gen-proto.sh" "$@"
     exit $?
 
+elif [[ "$1" == "build-compose" ]]; then
+    shift
+    docker compose build
+    exit $?
+
 elif [[ "$1" == "run-rust-server-local" ]]; then
     shift
     cd "$ROOT_DIRECTORY_FULL_PATH" || exit 1

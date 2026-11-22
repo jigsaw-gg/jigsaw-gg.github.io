@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
+    image: jigsaw-gg-server:${TAG:-latest}
     container_name: jigsaw-gg-server
     ports:
       - "127.0.0.1:21100:21100/tcp"
