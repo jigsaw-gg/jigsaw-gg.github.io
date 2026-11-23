@@ -1,3 +1,4 @@
+import { grabPickAtRest } from './grabPresentation.ts'
 import { cursorColor } from './groups.ts'
 import type { MousePathSmoother } from './mousePathSmoother.ts'
 import type { Placement } from './placement.ts'
@@ -8,9 +9,11 @@ import type {
   RemotePresentationPhase,
 } from './models.ts'
 
-/* placeholder 4 */
+/* placeholder 1 */
 /** Resting anchor matches painted hold — drop release overlay. */
 const SETTLE_PX = 6
+/** Painted cursor at the rest pick point — attach hold overlay. */
+const GRAB_COMMIT_PX = 28
 /** After settle, only chase wire when it is already near the painted cursor. */
 const WIRE_HANDOFF_PX = 96
 
@@ -92,7 +95,7 @@ export function composePaintFrame(input: {
   }[]
   presentationEvents: {
     playerId: string
-    name: 'settling_complete'
+    name: 'settling_complete' | 'grab_committed'
     gapPx: number
   }[]
   remotePiecePoses: RemotePiecePoseOtel[]
@@ -109,7 +112,7 @@ export function composePaintFrame(input: {
   const paintedByPlayer = new Map<string, { x: number; y: number }>()
   const presentationEvents: {
     playerId: string
-    name: 'settling_complete'
+    name: 'settling_complete' | 'grab_committed'
     gapPx: number
   }[] = []
 
@@ -125,7 +128,12 @@ export function composePaintFrame(input: {
     const smooth = input.remoteCursorSmooth.get(id)
     if (!cursor && !smooth) continue
     const wire = cursor ?? { x: 0, y: 0, hide: true }
-    if (wire.hide && phase?.kind !== 'settling') continue
+    if (
+      wire.hide &&
+      phase?.kind !== 'settling' &&
+      phase?.kind !== 'approaching_grab'
+    )
+      continue
 
     if (phase?.kind === 'settling' && smooth) {
       const restingAnchor = input.resting.find((p) => p.id === phase.anchorId)
@@ -135,6 +143,16 @@ export function composePaintFrame(input: {
           restingAnchor.y - phase.offsetY,
           input.now,
         )
+      }
+    }
+
+    if (phase?.kind === 'approaching_grab' && smooth) {
+      const restingAnchor = input.resting.find((p) => p.id === phase.anchorId)
+      if (restingAnchor) {
+        const target = phase.offsetReady
+          ? grabPickAtRest(restingAnchor, phase.offsetX, phase.offsetY)
+          : { x: restingAnchor.x, y: restingAnchor.y }
+        smooth.setTarget(target.x, target.y, input.now)
       }
     }
 
@@ -190,9 +208,35 @@ export function composePaintFrame(input: {
     )
   }
 
+  for (const [playerId, phase] of input.presentation) {
+    if (phase.kind !== 'approaching_grab') continue
+    const painted = paintedByPlayer.get(playerId)
+    const restingAnchor = input.resting.find((p) => p.id === phase.anchorId)
+    if (!painted || !restingAnchor || !phase.offsetReady) continue
+    const pick = grabPickAtRest(restingAnchor, phase.offsetX, phase.offsetY)
+    const gapPx = Math.hypot(painted.x - pick.x, painted.y - pick.y)
+    if (gapPx > GRAB_COMMIT_PX) continue
+    presentationEvents.push({
+      playerId,
+      name: 'grab_committed',
+      gapPx,
+    })
+    input.presentation.set(playerId, { kind: 'holding' })
+    const handoffSmooth = input.remoteCursorSmooth.get(playerId)
+    const wire = input.remoteCursors.get(playerId)
+    if (handoffSmooth) {
+      handoffSmooth.commitPresentedPose(input.now)
+      if (wire && !wire.hide) {
+        handoffSmooth.setTarget(wire.x, wire.y, input.now)
+      }
+    }
+  }
+
   for (const [playerId, held] of [...input.remoteHeld.entries()].sort((a, b) =>
     a[0] < b[0] ? 1 : -1,
   )) {
+    const phase = input.presentation.get(playerId)?.kind
+    if (phase === 'approaching_grab') continue
     applyHoldOverlay(
       playerId,
       held.anchorId,
@@ -277,14 +321,23 @@ export function composePaintFrame(input: {
   }
 
   for (const [playerId, held] of input.remoteHeld) {
-    const phase = input.presentation.get(playerId)?.kind ?? 'holding'
-    pushPiecePose(
-      playerId,
-      held.anchorId,
-      held.offsetX,
-      held.offsetY,
-      phase === 'holding' ? 'holding' : phase,
-    )
+    const presentation = input.presentation.get(playerId)
+    const phaseKind = presentation?.kind ?? 'holding'
+    const telemetryPhase =
+      phaseKind === 'holding'
+        ? 'holding'
+        : phaseKind === 'approaching_grab'
+          ? 'approaching_grab'
+          : phaseKind
+    const offsetX =
+      presentation?.kind === 'approaching_grab'
+        ? presentation.offsetX
+        : held.offsetX
+    const offsetY =
+      presentation?.kind === 'approaching_grab'
+        ? presentation.offsetY
+        : held.offsetY
+    pushPiecePose(playerId, held.anchorId, offsetX, offsetY, telemetryPhase)
   }
   for (const [playerId, phase] of input.presentation) {
     if (phase.kind !== 'settling') continue

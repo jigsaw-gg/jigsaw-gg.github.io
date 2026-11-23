@@ -46,7 +46,7 @@ Target layout under `apps/web/src/`: `core`, `otel`, `network`, `jigsaw`, `world
 
 A git worktree does not use Vite's default port. Setup (`.cursor/worktrees.json` → `scripts/setup-worktree.sh`) picks a free port in 20000–49999 and writes it to `.worktree-port`, then runs `npm ci` when `node_modules/.bin/vite` is missing. `.worktree-port` is gitignored and stays with the worktree. Vite reads it and binds `127.0.0.1` with `strictPort`, so the server will not move to another port if this one is busy.
 
-The main checkout has no `.worktree-port`. There, `npm run dev` keeps Vite's default port.
+The main checkout has no `.worktree-port`. There, `npm run dev` binds **5174** on `127.0.0.1` (`strictPort`).
 
 When working in a worktree:
 
@@ -116,8 +116,9 @@ Local client and `jigsaw-gg-server` both export into the same traces stream
 
 Every browser span also carries build stamps from the active bundle (inlined at
 `vite` dev-server start / `npm run build`): `web_commit_sha` (full `HEAD`) and
-`web_files_sha` (SHA-256 over sorted `git ls-files` working-tree contents).
-Uncommitted edits change `web_files_sha` only. Dev: `virtual:web-build-meta`
+`web_files_sha` (SHA-256 over sorted build inputs: `git ls-files`, untracked
+non-ignored paths, and gitignored `.env` / `config.json` when present).
+Uncommitted or untracked edits change `web_files_sha`. Dev: `virtual:web-build-meta`
 recomputes on full page load; saving a tracked file triggers a debounced
 full reload when the digest changes (no manual `npm run dev` restart). Editing
 `apps/web/build/meta.ts` still restarts Vite because it is a config dependency.

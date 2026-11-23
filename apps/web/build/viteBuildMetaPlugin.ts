@@ -33,7 +33,8 @@ function isIgnoredPath(file: string, repoRoot: string): boolean {
 
 /**
  * Dev: recompute {@link resolveWebBuildMeta} when the virtual module loads and
- * full-reload when the digest changes (any tracked repo file). Build: bundle
+ * full-reload when the digest changes (tracked, untracked, and local env
+ * inputs). Build: bundle
  * once per production build.
  */
 export function viteBuildMetaPlugin(repoRoot: string): Plugin {

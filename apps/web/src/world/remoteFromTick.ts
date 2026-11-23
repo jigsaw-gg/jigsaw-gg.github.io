@@ -1,3 +1,4 @@
+import { grabOffsetTrustworthy } from './grabPresentation.ts'
 import { idFromIndex, pieceIndex } from './groups.ts'
 import type { MotionPacket } from './motion.ts'
 import { MousePathSmoother } from './mousePathSmoother.ts'
@@ -50,7 +51,7 @@ function feedCursorTarget(
   wire: CursorTarget,
   nowMs: number,
 ): void {
-  if (phase?.kind === 'settling') {
+  if (phase?.kind === 'settling' || phase?.kind === 'approaching_grab') {
     return
   }
   if (wire.hide) return
@@ -150,21 +151,71 @@ export function applyRemoteTickMaps(input: {
 
     const cursorPacket = pose?.cursor
     const heldPacket = pose?.held && !pose.held.hide ? pose.held : null
+    const anchorId = idFromIndex(anchorIndex, input.cols)
+    const existingPhase = input.presentation.get(playerId)
+    const approach =
+      existingPhase?.kind === 'approaching_grab' ? existingPhase : null
+
     let offsetX = prev?.offsetX ?? 0
     let offsetY = prev?.offsetY ?? 0
-    if (heldPacket && cursorPacket && !cursorPacket.hide && !heldPacket.hide) {
+    let offsetReady = approach?.offsetReady ?? false
+
+    const trustOffset =
+      heldPacket &&
+      cursorPacket &&
+      grabOffsetTrustworthy(heldPacket, cursorPacket)
+
+    if (trustOffset) {
       offsetX = heldPacket.x - cursorPacket.x
       offsetY = heldPacket.y - cursorPacket.y
+      offsetReady = true
+    } else if (approach) {
+      offsetX = approach.offsetX
+      offsetY = approach.offsetY
+    } else if (
+      input.prevHeld.has(playerId) &&
+      heldPacket &&
+      cursorPacket &&
+      !cursorPacket.hide &&
+      !heldPacket.hide
+    ) {
+      offsetX = heldPacket.x - cursorPacket.x
+      offsetY = heldPacket.y - cursorPacket.y
+    } else if (!input.prevHeld.has(playerId)) {
+      offsetX = 0
+      offsetY = 0
+      offsetReady = false
     }
 
     nextHeld.set(playerId, {
-      anchorId: idFromIndex(anchorIndex, input.cols),
+      anchorId,
       group: idFromIndex(groupId, input.cols),
       members,
       offsetX,
       offsetY,
     })
-    input.presentation.set(playerId, { kind: 'holding' })
+    if (approach) {
+      input.presentation.set(playerId, {
+        ...approach,
+        offsetX,
+        offsetY,
+        offsetReady,
+      })
+    } else if (
+      input.prevHeld.has(playerId) &&
+      input.presentation.get(playerId)?.kind === 'holding'
+    ) {
+      input.presentation.set(playerId, { kind: 'holding' })
+    } else {
+      input.presentation.set(playerId, {
+        kind: 'approaching_grab',
+        anchorId,
+        members: [...members],
+        offsetX,
+        offsetY,
+        offsetReady,
+      })
+    }
   }
 
   for (const [playerId, prev] of input.prevHeld) {
@@ -194,16 +245,21 @@ export function applyRemoteTickMaps(input: {
 
     let phase = input.presentation.get(playerId)
     if (nextHeld.has(playerId)) {
-      phase = { kind: 'holding' }
-      input.presentation.set(playerId, phase)
-    } else if (phase?.kind === 'settling') {
-      // keep until paint completes settle
+      if (phase?.kind !== 'approaching_grab' && phase?.kind !== 'holding') {
+        phase = { kind: 'holding' }
+        input.presentation.set(playerId, phase)
+      }
+    } else if (
+      phase?.kind === 'settling' ||
+      phase?.kind === 'approaching_grab'
+    ) {
+      // paint frame owns completion / commit
     } else {
       phase = { kind: 'tracking' }
       input.presentation.set(playerId, phase)
     }
 
-    if (phase.kind === 'settling') {
+    if (phase?.kind === 'settling' || phase?.kind === 'approaching_grab') {
       liveWireCursorIds.add(playerId)
       ensureSmoother(input.cursorSmooth, playerId, input.presentationDelayMs)
       continue
@@ -221,7 +277,7 @@ export function applyRemoteTickMaps(input: {
 
   for (const id of [...input.cursorSmooth.keys()]) {
     const phase = input.presentation.get(id)?.kind
-    if (phase === 'settling') continue
+    if (phase === 'settling' || phase === 'approaching_grab') continue
     if (!liveWireCursorIds.has(id) && !nextHeld.has(id)) {
       input.cursorSmooth.delete(id)
     }

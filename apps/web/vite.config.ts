@@ -232,6 +232,8 @@ function resolveTelegramIdentity(mode: string): {
   return { bot, app, title }
 }
 
+const DEFAULT_DEV_PORT = 5174
+
 function worktreeDevPort(): number | undefined {
   try {
     const path = resolve(repoRoot, '.worktree-port')
@@ -245,22 +247,17 @@ function worktreeDevPort(): number | undefined {
 }
 
 export default defineConfig(({ mode }) => {
-  const port = worktreeDevPort()
+  const port = worktreeDevPort() ?? DEFAULT_DEV_PORT
   const build = resolveBuildInfo()
   const telegram = resolveTelegramIdentity(mode)
   const otel = resolveOtel(mode)
   const https = lanHttpsOptions()
-  const worktreeServer =
-    port === undefined
-      ? undefined
-      : { host: '127.0.0.1' as const, port, strictPort: true as const }
-  const server =
-    worktreeServer || https
-      ? {
-          ...(worktreeServer ?? {}),
-          ...(https ? { https } : {}),
-        }
-      : undefined
+  const server = {
+    host: '127.0.0.1' as const,
+    port,
+    strictPort: true as const,
+    ...(https ? { https } : {}),
+  }
   return {
     root: webRoot,
     envDir: repoRoot,

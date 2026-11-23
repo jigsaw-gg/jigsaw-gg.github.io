@@ -2,7 +2,7 @@
 export const TAB_ID_ATTR = 'jigsaw.tab.id'
 /** Full HEAD at bundle build; SQL column `web_commit_sha`. */
 export const WEB_COMMIT_SHA_ATTR = 'web.commit_sha'
-/** Hash of tracked file contents at bundle build; SQL column `web_files_sha`. */
+/** Hash of web build inputs at bundle time; SQL column `web_files_sha`. */
 export const WEB_FILES_SHA_ATTR = 'web.files_sha'
 /** Set while a puzzle play session is active. */
 export const SESSION_ID_ATTR = 'jigsaw.session.id'

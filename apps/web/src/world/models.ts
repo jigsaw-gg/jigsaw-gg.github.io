@@ -31,6 +31,15 @@ export interface RemoteHeld {
 export type RemotePresentationPhase =
   | { kind: 'holding' }
   | {
+      kind: 'approaching_grab'
+      anchorId: string
+      members: string[]
+      offsetX: number
+      offsetY: number
+      /** Grab offset from wire; false until cursor is near held (not re-entry). */
+      offsetReady: boolean
+    }
+  | {
       kind: 'settling'
       anchorId: string
       members: string[]
