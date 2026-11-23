@@ -63,10 +63,17 @@ pub struct RoomState {
     server_seq: u64,
     empty_since: Option<Instant>,
     session_started_at: Instant,
+    presentation_delay_ms: u32,
 }
 
 impl RoomState {
-    pub fn new(game_id: String, setup: PuzzleSetup, cols: u32, rows: u32) -> Self {
+    pub fn new(
+        game_id: String,
+        setup: PuzzleSetup,
+        cols: u32,
+        rows: u32,
+        presentation_delay_ms: u32,
+    ) -> Self {
         let cell_w = setup.image_width as f32 / cols.max(1) as f32;
         let cell_h = setup.image_height as f32 / rows.max(1) as f32;
         let board = initial_board(&setup, cols, rows);
@@ -84,6 +91,7 @@ impl RoomState {
             server_seq: 0,
             empty_since: None,
             session_started_at: Instant::now(),
+            presentation_delay_ms,
         }
     }
 
@@ -205,12 +213,19 @@ pub struct RoomHandle {
 }
 
 impl RoomHandle {
-    pub fn spawn(game_id: String, setup: PuzzleSetup, cols: u32, rows: u32) -> Arc<Self> {
+    pub fn spawn(
+        game_id: String,
+        setup: PuzzleSetup,
+        cols: u32,
+        rows: u32,
+        presentation_delay_ms: u32,
+    ) -> Arc<Self> {
         let state = Arc::new(Mutex::new(RoomState::new(
             game_id.clone(),
             setup,
             cols,
             rows,
+            presentation_delay_ms,
         )));
         let (cmd_tx, cmd_rx) = mpsc::channel(512);
         let handle = Arc::new(Self {
@@ -390,6 +405,7 @@ fn handle_command(st: &mut RoomState, cmd: RoomCommand) {
                 heartbeat_timeout_ms: HEARTBEAT_TIMEOUT_MS,
                 dual_bidi_streams: dual,
                 transport: transport as i32,
+                presentation_delay_ms: st.presentation_delay_ms,
             }));
             let welcome = StreamFrame {
                 stream: StreamKind::World as i32,
@@ -1142,7 +1158,7 @@ mod tests {
             seed: 3,
             rotation_enabled,
         };
-        let mut st = RoomState::new("g".into(), setup, 3, 2);
+        let mut st = RoomState::new("g".into(), setup, 3, 2, 100);
         for p in &mut st.board.pieces {
             p.rotation = 0;
         }

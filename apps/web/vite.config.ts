@@ -7,6 +7,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { browserLogPlugin } from '../../dev/browserLogPlugin.ts'
 import { lanHttpsOptions } from '../../dev/devHttps.ts'
+import { viteBuildMetaPlugin } from './build/viteBuildMetaPlugin.ts'
 
 const webRoot = fileURLToPath(new URL('.', import.meta.url))
 const repoRoot = resolve(webRoot, '../..')
@@ -267,6 +268,7 @@ export default defineConfig(({ mode }) => {
     base: '/',
     server,
     plugins: [
+      viteBuildMetaPlugin(repoRoot),
       react(),
       shareImageCacheBust(),
       githubPagesSpaFallback(),

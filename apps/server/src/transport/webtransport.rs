@@ -164,10 +164,10 @@ async fn handle_game_session(
                                         let games_dup = games2.clone();
                                         let gid_dup = gid.clone();
                                         let pid_dup = pid.clone();
-                                        if glitch_in.should_repeat_inbound().await {
-                                            if let Some(room) = games_dup.room(&gid_dup) {
-                                                room.push_input(&pid_dup, env.clone()).await;
-                                            }
+                                        if glitch_in.should_repeat_inbound().await
+                                            && let Some(room) = games_dup.room(&gid_dup)
+                                        {
+                                            room.push_input(&pid_dup, env.clone()).await;
                                         }
                                     }
                                 }
@@ -201,10 +201,10 @@ async fn handle_game_session(
                                         let games_dup = games2.clone();
                                         let gid_dup = gid.clone();
                                         let pid_dup = pid.clone();
-                                        if glitch_in.should_repeat_inbound().await {
-                                            if let Some(room) = games_dup.room(&gid_dup) {
-                                                room.push_input(&pid_dup, env.clone()).await;
-                                            }
+                                        if glitch_in.should_repeat_inbound().await
+                                            && let Some(room) = games_dup.room(&gid_dup)
+                                        {
+                                            room.push_input(&pid_dup, env.clone()).await;
                                         }
                                     }
                                 }

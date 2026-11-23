@@ -114,7 +114,115 @@ Local client and `jigsaw-gg-server` both export into the same traces stream
 | Tab                   | `jigsaw_tab_id`                                           | _(none — server has no tab id)_ |
 | Player (NanoID)       | `jigsaw_player_id`                                        | `player_id`                     |
 
+Every browser span also carries build stamps from the active bundle (inlined at
+`vite` dev-server start / `npm run build`): `web_commit_sha` (full `HEAD`) and
+`web_files_sha` (SHA-256 over sorted `git ls-files` working-tree contents).
+Uncommitted edits change `web_files_sha` only. Dev: `virtual:web-build-meta`
+recomputes on full page load; saving a tracked file triggers a debounced
+full reload when the digest changes (no manual `npm run dev` restart). Editing
+`apps/web/build/meta.ts` still restarts Vite because it is a config dependency.
+
+**Align bundle with repo:** dev **About** page lists the same `web.commit_sha` /
+`web.files_sha` as spans; locally compare with `npm run compute:web-stamps`
+(repo root). If a bug report’s `web_files_sha` does not match your tree, you are
+not reproducing their client build.
+
 `service_name`: browser = `jigsaw-gg`, server = `jigsaw-gg-server`.
+
+When interpreting traces, follow [`.cursor/rules/003-telemetry.mdc`](.cursor/rules/003-telemetry.mdc):
+prefer evidence over guesses; say when confidence is low and what extra spans or
+a repeat session would clarify.
+
+### OTEL search hints
+
+**Investigation order:** (1) `COUNT(*)` / `GROUP BY jigsaw_tab_id` for the
+session window — fix `end_time` if zero rows; (2) `DISTINCT web_files_sha` on
+any client span; (3) map `jigsaw_tab_id` → `jigsaw_player_id` (step 3 below);
+(4) symptom query on the **observer** tab unless the bug is local-only input.
+
+**Time bounds:** `_timestamp`, `start_time`, and `end_time` in MCP queries are
+**microseconds** since epoch (`Date.now() * 1000` from JS). Anchor a tight
+window on mover `piece.drag_start` / `piece.drag_end` `_timestamp`s, then add
+slack for observer presentation lag.
+
+**Cross-service OR** (one game id):
+
+```sql
+WHERE (service_name = 'jigsaw-gg' AND jigsaw_session_id = '<SESSION_ID>')
+   OR (service_name = 'jigsaw-gg-server' AND game_id = '<SESSION_ID>')
+```
+
+**Stamps on a session** (which tabs saw which bundle):
+
+```sql
+SELECT DISTINCT jigsaw_tab_id, web_commit_sha, web_files_sha
+FROM "default"
+WHERE jigsaw_session_id = '<SESSION_ID>'
+  AND web_files_sha IS NOT NULL
+  AND web_files_sha != ''
+```
+
+**Observer remote piece** (`operation_name = 'piece.remote'`, ~20 Hz on observer
+only). SQL column names follow event fields; if a name 404s, check
+`StreamSchema` (camelCase fields often land as lowercase, e.g. `gapPx` →
+`gappx`):
+
+```sql
+SELECT
+  histogram(_timestamp, '1 second') AS t,
+  max(gappx) AS max_gap,
+  min(gappx) AS min_gap,
+  any(presentationphase) AS phase,
+  any(pieceid) AS piece
+FROM "default"
+WHERE jigsaw_session_id = '<SESSION_ID>'
+  AND jigsaw_tab_id = '<OBSERVER_TAB_ID>'
+  AND operation_name = 'piece.remote'
+  AND _timestamp BETWEEN <DRAG_START_US> AND <DRAG_END_US>
+GROUP BY t
+ORDER BY t ASC
+```
+
+Flat `max_gap` with `presentationphase = 'settling'` for seconds after mover
+`piece.drag_end` → presentation smoother / wire handoff stall (compare `restx` /
+`resty` to painted `x`/`y` on the same rows).
+
+**Presentation phase edges** (sparse, good for hold/release boundaries):
+
+```sql
+SELECT _timestamp, phase, gappx, remoteplayerid
+FROM "default"
+WHERE jigsaw_session_id = '<SESSION_ID>'
+  AND operation_name = 'game.presentation.phase'
+ORDER BY _timestamp ASC
+```
+
+**Remote cursor vs wire target** (observer, same throttle as `piece.remote`):
+
+```sql
+SELECT _timestamp, x, y, targetx, targety, remoteplayerid
+FROM "default"
+WHERE jigsaw_session_id = '<SESSION_ID>'
+  AND jigsaw_tab_id = '<OBSERVER_TAB_ID>'
+  AND operation_name = 'cursor.remote'
+  AND _timestamp BETWEEN <T0> AND <T1>
+ORDER BY _timestamp ASC
+```
+
+Sane `targetx`/`targety` with jumping `x`/`y` → smoother presentation, not bad
+server poses. Mover tab should show `cursor.local` in the same interval; gaps
+in `cursor.local` with continuing `cursor.remote` are off-board / leave-window
+windows.
+
+| Symptom (observer)                       | What to compare                                                                                     |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Piece frozen mid-drag                    | Mover `cursor.local` + server `move_held` vs observer `piece.remote` `gappx` during `holding`       |
+| Piece short of destination after release | `settling` + high flat `gappx`; `restx`/`resty` vs final server `release` / tick rest               |
+| Teleport on new drag                     | New `game.presentation.phase` `holding` while prior `settling` still shows large `gappx`            |
+| Cursor flies to corner                   | Mover `cursor.local` negative or huge `y` near `piece.drag_end`; observer `cursor.remote` `target*` |
+
+**Categories:** remote piece/cursor spans need `input` in `OTEL_ENABLED_FOR`
+(local default often includes `input`; empty / `all` enables everything).
 
 **1. Client spans for a session (all tabs):**
 
@@ -137,6 +245,13 @@ presentation smoother, `targetX`/`targetY` delayed chase point from
 points at the smoother, not the wire. Compare the same wall-clock window
 across both `jigsaw_tab_id`s; stationary mover gaps (no `cursor.local`) with
 continuing `cursor.remote` are the usual bounce/lag windows.
+
+Observer tab also emits `piece.remote` (~20 Hz, same throttle as
+`cursor.remote`): painted hold **anchor** `x`/`y`, authoritative resting
+`restX`/`restY`, overlay `gapPx`, `presentationPhase`
+(`holding` / `settling` / `tracking`), plus `cursorX`/`cursorY` and
+`offsetX`/`offsetY`. Large `gapPx` on release pinpoints piece snap vs
+smoothed cursor.
 
 **3. Map tab → player_id** (needed for server queries):
 

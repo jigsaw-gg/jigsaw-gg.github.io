@@ -1,5 +1,6 @@
 import { createUlidLikeId } from '../core/id.ts'
 import { SESSION_ID_ATTR, TAB_ID_ATTR, TRANSPORT_ATTR } from './attrs.ts'
+import { buildMetaAttributes } from './buildMeta.ts'
 import { sessionTimeAttributes } from './sessionTime.ts'
 
 /** Stable for this document load; new tab / hard refresh gets a new id. */
@@ -53,6 +54,7 @@ export function subscribePlayTransport(listener: () => void): () => void {
 
 export function contextAttributes(): Record<string, string | number> {
   const attrs: Record<string, string | number> = { [TAB_ID_ATTR]: TAB_ID }
+  Object.assign(attrs, buildMetaAttributes())
   if (puzzleSessionId) attrs[SESSION_ID_ATTR] = puzzleSessionId
   if (playTransport) attrs[TRANSPORT_ATTR] = playTransport
   Object.assign(attrs, sessionTimeAttributes())

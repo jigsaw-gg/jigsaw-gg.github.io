@@ -1,7 +1,34 @@
 import { cursorColor } from './groups.ts'
 import type { MousePathSmoother } from './mousePathSmoother.ts'
 import type { Placement } from './placement.ts'
-import type { CursorTarget, RemoteCursor, RemoteHeld } from './models.ts'
+import type {
+  CursorTarget,
+  RemoteCursor,
+  RemoteHeld,
+  RemotePresentationPhase,
+} from './models.ts'
+
+/* placeholder 4 */
+/** Resting anchor matches painted hold — drop release overlay. */
+const SETTLE_PX = 6
+/** After settle, only chase wire when it is already near the painted cursor. */
+const WIRE_HANDOFF_PX = 96
+
+/** Observer-painted remote hold anchor (for OTEL / OpenObserve). */
+export type RemotePiecePoseOtel = {
+  playerId: string
+  anchorId: string
+  presentationPhase: RemotePresentationPhase['kind'] | 'none'
+  cursorX: number
+  cursorY: number
+  offsetX: number
+  offsetY: number
+  x: number
+  y: number
+  restX: number
+  restY: number
+  gapPx: number
+}
 
 export function cursorsEqual(
   left: readonly RemoteCursor[],
@@ -46,7 +73,7 @@ export function composePaintFrame(input: {
   remoteCursors: ReadonlyMap<string, CursorTarget>
   remoteCursorSmooth: ReadonlyMap<string, MousePathSmoother>
   remoteHeld: ReadonlyMap<string, RemoteHeld>
-  remoteHeldSmooth: ReadonlyMap<string, MousePathSmoother>
+  presentation: Map<string, RemotePresentationPhase>
   localClaimedGroup: string | null
   peerNames: ReadonlyMap<string, string>
   fallbackName: string
@@ -63,6 +90,12 @@ export function composePaintFrame(input: {
     targetX: number
     targetY: number
   }[]
+  presentationEvents: {
+    playerId: string
+    name: 'settling_complete'
+    gapPx: number
+  }[]
+  remotePiecePoses: RemotePiecePoseOtel[]
 } {
   const nextCursors: RemoteCursor[] = []
   const remoteCursorPoses: {
@@ -73,21 +106,52 @@ export function composePaintFrame(input: {
     targetY: number
   }[] = []
 
-  for (const [id, cursor] of input.remoteCursors) {
-    if (cursor.hide) continue
+  const paintedByPlayer = new Map<string, { x: number; y: number }>()
+  const presentationEvents: {
+    playerId: string
+    name: 'settling_complete'
+    gapPx: number
+  }[] = []
+
+  const paintIds = new Set<string>([
+    ...input.remoteCursors.keys(),
+    ...input.remoteCursorSmooth.keys(),
+    ...input.presentation.keys(),
+  ])
+
+  for (const id of paintIds) {
+    const cursor = input.remoteCursors.get(id)
+    const phase = input.presentation.get(id)
     const smooth = input.remoteCursorSmooth.get(id)
-    const pose = smooth?.step(input.dtSec, input.now) ?? {
-      x: cursor.x,
-      y: cursor.y,
+    if (!cursor && !smooth) continue
+    const wire = cursor ?? { x: 0, y: 0, hide: true }
+    if (wire.hide && phase?.kind !== 'settling') continue
+
+    if (phase?.kind === 'settling' && smooth) {
+      const restingAnchor = input.resting.find((p) => p.id === phase.anchorId)
+      if (restingAnchor) {
+        smooth.setTarget(
+          restingAnchor.x - phase.offsetX,
+          restingAnchor.y - phase.offsetY,
+          input.now,
+        )
+      }
     }
+
+    const pose = smooth?.step(input.dtSec, input.now) ?? {
+      x: wire.x,
+      y: wire.y,
+    }
+
     const delayed = smooth?.delayedTarget()
     remoteCursorPoses.push({
       id,
       x: pose.x,
       y: pose.y,
-      targetX: delayed?.x ?? cursor.x,
-      targetY: delayed?.y ?? cursor.y,
+      targetX: delayed?.x ?? wire.x,
+      targetY: delayed?.y ?? wire.y,
     })
+    paintedByPlayer.set(id, pose)
     nextCursors.push({
       id,
       name: input.peerNames.get(id) ?? input.fallbackName,
@@ -100,32 +164,146 @@ export function composePaintFrame(input: {
 
   let composed = input.resting.map((p) => ({ ...p }))
   const raised: string[] = []
-  for (const [playerId, held] of [...input.remoteHeld.entries()].sort((a, b) =>
-    a[0] < b[0] ? 1 : -1,
-  )) {
-    raised.push(held.group)
-    const anchor = composed.find((p) => p.id === held.anchorId)
-    if (!anchor) continue
-    const smooth = input.remoteHeldSmooth.get(playerId)
-    const pose = smooth?.step(input.dtSec, input.now) ?? {
-      x: held.x,
-      y: held.y,
-    }
-    const dx = pose.x - anchor.x
-    const dy = pose.y - anchor.y
-    const memberSet = new Set(held.members)
+
+  const applyHoldOverlay = (
+    playerId: string,
+    anchorId: string,
+    members: readonly string[],
+    offsetX: number,
+    offsetY: number,
+    raiseGroup: string | null,
+  ): void => {
+    const anchor = composed.find((p) => p.id === anchorId)
+    if (!anchor) return
+    const painted = paintedByPlayer.get(playerId)
+    if (!painted) return
+    const heldAnchorX = painted.x + offsetX
+    const heldAnchorY = painted.y + offsetY
+    const dx = heldAnchorX - anchor.x
+    const dy = heldAnchorY - anchor.y
+    if (raiseGroup) raised.push(raiseGroup)
+    const memberSet = new Set(members)
     composed = composed.map((piece) =>
       memberSet.has(piece.id)
         ? { ...piece, x: piece.x + dx, y: piece.y + dy }
         : piece,
     )
   }
+
+  for (const [playerId, held] of [...input.remoteHeld.entries()].sort((a, b) =>
+    a[0] < b[0] ? 1 : -1,
+  )) {
+    applyHoldOverlay(
+      playerId,
+      held.anchorId,
+      held.members,
+      held.offsetX,
+      held.offsetY,
+      held.group,
+    )
+  }
+
+  for (const [playerId, phase] of input.presentation) {
+    if (phase.kind !== 'settling') continue
+    const restingAnchor = input.resting.find((p) => p.id === phase.anchorId)
+    applyHoldOverlay(
+      playerId,
+      phase.anchorId,
+      phase.members,
+      phase.offsetX,
+      phase.offsetY,
+      restingAnchor?.group ?? null,
+    )
+    const anchor = restingAnchor
+    const painted = paintedByPlayer.get(playerId)
+    if (!anchor || !painted) continue
+    const dx = painted.x + phase.offsetX - anchor.x
+    const dy = painted.y + phase.offsetY - anchor.y
+    const gapPx = Math.hypot(dx, dy)
+    if (gapPx <= SETTLE_PX) {
+      presentationEvents.push({
+        playerId,
+        name: 'settling_complete',
+        gapPx,
+      })
+      input.presentation.set(playerId, { kind: 'tracking' })
+      const handoffSmooth = input.remoteCursorSmooth.get(playerId)
+      const painted = paintedByPlayer.get(playerId)
+      const wire = input.remoteCursors.get(playerId)
+      if (handoffSmooth && painted) {
+        handoffSmooth.commitPresentedPose(input.now)
+        if (wire && !wire.hide) {
+          const wireGap = Math.hypot(wire.x - painted.x, wire.y - painted.y)
+          if (wireGap <= WIRE_HANDOFF_PX) {
+            handoffSmooth.setTarget(wire.x, wire.y, input.now)
+          }
+        }
+      }
+    }
+  }
   if (input.localClaimedGroup) raised.push(input.localClaimedGroup)
+
+  const remotePiecePoses: RemotePiecePoseOtel[] = []
+
+  const pushPiecePose = (
+    playerId: string,
+    anchorId: string,
+    offsetX: number,
+    offsetY: number,
+    phase: RemotePresentationPhase['kind'] | 'none',
+  ): void => {
+    const restingAnchor = input.resting.find((p) => p.id === anchorId)
+    const paintedAnchor = composed.find((p) => p.id === anchorId)
+    const cursor = paintedByPlayer.get(playerId)
+    if (!restingAnchor || !paintedAnchor || !cursor) return
+    const gapPx = Math.hypot(
+      paintedAnchor.x - restingAnchor.x,
+      paintedAnchor.y - restingAnchor.y,
+    )
+    remotePiecePoses.push({
+      playerId,
+      anchorId,
+      presentationPhase: phase,
+      cursorX: cursor.x,
+      cursorY: cursor.y,
+      offsetX,
+      offsetY,
+      x: paintedAnchor.x,
+      y: paintedAnchor.y,
+      restX: restingAnchor.x,
+      restY: restingAnchor.y,
+      gapPx,
+    })
+  }
+
+  for (const [playerId, held] of input.remoteHeld) {
+    const phase = input.presentation.get(playerId)?.kind ?? 'holding'
+    pushPiecePose(
+      playerId,
+      held.anchorId,
+      held.offsetX,
+      held.offsetY,
+      phase === 'holding' ? 'holding' : phase,
+    )
+  }
+  for (const [playerId, phase] of input.presentation) {
+    if (phase.kind !== 'settling') continue
+    pushPiecePose(
+      playerId,
+      phase.anchorId,
+      phase.offsetX,
+      phase.offsetY,
+      'settling',
+    )
+  }
+  remotePiecePoses.sort((a, b) => a.playerId.localeCompare(b.playerId))
 
   return {
     cursors: nextCursors,
     raisedGroups: raised,
     placements: composed,
     remoteCursorPoses,
+    presentationEvents,
+    remotePiecePoses,
   }
 }

@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
         config.key_file.as_deref(),
     )?;
     let hub = Hub::new(&config);
-    let games = GameStore::new();
+    let games = GameStore::new(config.presentation_delay_ms);
 
     info!(
         server_id = %otel::server_id(),

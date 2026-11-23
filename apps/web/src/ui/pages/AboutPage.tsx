@@ -10,6 +10,7 @@ import {
   setWebTransportEnabled,
   subscribeWebTransportEnabled,
 } from '../../core/transportPrefs.ts'
+import { WEB_COMMIT_SHA, WEB_FILES_SHA } from '../../otel/buildMeta.ts'
 
 function relayStatusLabel(
   status: RelayStatus,
@@ -138,6 +139,22 @@ export function AboutPage() {
             commitShow={about.commitShow}
             commitHide={about.commitHide}
           />
+          {import.meta.env.DEV ? (
+            <dl className="facts about-build-stamps">
+              <div>
+                <dt>web.commit_sha</dt>
+                <dd>
+                  <code>{WEB_COMMIT_SHA || '—'}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>web.files_sha</dt>
+                <dd>
+                  <code>{WEB_FILES_SHA || '—'}</code>
+                </dd>
+              </div>
+            </dl>
+          ) : null}
           {serverBuild.status === 'loading' ? (
             <div className="about-build-target">
               <h3 className="about-build-target__title">

@@ -86,6 +86,7 @@ Optional application-level impairment on play `/game` frames and opaque relay tr
 | `NETWORK_GLITCH_LATENCY_JITTER_MS` | `0`     | ± uniform jitter around the mean (ms); can reorder       |
 | `NETWORK_GLITCH_DROP_PERCENT`      | `0`     | Drop chance 0–100                                        |
 | `NETWORK_GLITCH_DUP_PERCENT`       | `0`     | Duplicate chance 0–100 (second send after another delay) |
+| `PRESENTATION_DELAY_MS`            | `100`   | Remote cursor/held lag in `Welcome` for client smoothers |
 
 `./manage.sh run-rust-server-local` loads repo-root `.env` and optional `apps/server/.local.env`, so you can keep glitch knobs in `.local.env`.
 

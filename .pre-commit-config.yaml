@@ -42,7 +42,10 @@ repos:
       - id: cargo-check
         name: cargo-check
         files: ^apps/server/.*\.(rs|toml)$
-        args: [--manifest-path=apps/server/Cargo.toml]
+        args:
+          - --manifest-path=apps/server/Cargo.toml
+          - --config
+          - build.warnings="deny"
         pass_filenames: false
       - id: clippy
         name: clippy

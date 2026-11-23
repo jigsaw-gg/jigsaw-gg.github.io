@@ -5,6 +5,7 @@ export type {
   LocalDrag,
   RemoteCursor,
   RemoteHeld,
+  RemotePresentationPhase,
   SyncApi,
 } from './models.ts'
 export {
@@ -12,6 +13,7 @@ export {
   composePaintFrame,
   cursorsEqual,
   sameStrings,
+  type RemotePiecePoseOtel,
 } from './paintState.ts'
 export { createLocalInputApi } from './localInput.ts'
 export { applyRemoteTickMaps } from './remoteFromTick.ts'

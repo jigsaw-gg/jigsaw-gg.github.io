@@ -130,7 +130,6 @@ async fn handle_socket(socket: WebSocket, state: Arc<HttpState>, query: WsQuery)
                 if glitch_in.impair_inbound().await {
                     continue;
                 }
-                let payload = Bytes::from(payload);
                 let hub_in = hub.clone();
                 let cid = client_id.clone();
                 let room_in = room.clone();

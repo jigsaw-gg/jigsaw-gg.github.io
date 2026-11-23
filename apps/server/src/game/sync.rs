@@ -160,10 +160,10 @@ pub async fn handle_websocket_game(
                                 let store_in = store.clone();
                                 let gid = game_id.clone();
                                 let pid = player_id.clone();
-                                if glitch_in.should_repeat_inbound().await {
-                                    if let Some(room) = store_in.room(&gid) {
-                                        room.push_input(&pid, env.clone()).await;
-                                    }
+                                if glitch_in.should_repeat_inbound().await
+                                    && let Some(room) = store_in.room(&gid)
+                                {
+                                    room.push_input(&pid, env.clone()).await;
                                 }
                             }
                         }

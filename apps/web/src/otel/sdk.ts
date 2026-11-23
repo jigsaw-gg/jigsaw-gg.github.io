@@ -6,7 +6,16 @@ import {
   WebTracerProvider,
 } from '@opentelemetry/sdk-trace-web'
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
-import { TAB_ID_ATTR } from './attrs.ts'
+import {
+  TAB_ID_ATTR,
+  WEB_COMMIT_SHA_ATTR,
+  WEB_FILES_SHA_ATTR,
+} from './attrs.ts'
+import {
+  buildMetaAttributes,
+  WEB_COMMIT_SHA,
+  WEB_FILES_SHA,
+} from './buildMeta.ts'
 import { openobserveOtlpHeaders, type OtelConfig } from './config.ts'
 import { TAB_ID } from './context.ts'
 
@@ -22,11 +31,15 @@ export function startOtelSdk(config: OtelConfig): void {
     headers: openobserveOtlpHeaders(config.username, config.password),
   })
 
+  const resourceAttrs: Record<string, string> = {
+    [ATTR_SERVICE_NAME]: SERVICE_NAME,
+    [TAB_ID_ATTR]: TAB_ID,
+  }
+  if (WEB_COMMIT_SHA) resourceAttrs[WEB_COMMIT_SHA_ATTR] = WEB_COMMIT_SHA
+  if (WEB_FILES_SHA) resourceAttrs[WEB_FILES_SHA_ATTR] = WEB_FILES_SHA
+
   const provider = new WebTracerProvider({
-    resource: resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: SERVICE_NAME,
-      [TAB_ID_ATTR]: TAB_ID,
-    }),
+    resource: resourceFromAttributes(resourceAttrs),
     spanProcessors: [
       new BatchSpanProcessor(exporter, {
         scheduledDelayMillis: 1000,
@@ -40,7 +53,7 @@ export function startOtelSdk(config: OtelConfig): void {
   // Smoke span so OpenObserve shows the service before other traffic.
   const tracer = trace.getTracer(SERVICE_NAME)
   const span = tracer.startSpan('otel.startup', {
-    attributes: { [TAB_ID_ATTR]: TAB_ID },
+    attributes: { [TAB_ID_ATTR]: TAB_ID, ...buildMetaAttributes() },
   })
   span.end()
   void provider.forceFlush().catch(() => {

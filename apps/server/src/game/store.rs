@@ -56,14 +56,16 @@ pub struct GameStore {
 struct GameStoreInner {
     definitions: DashMap<String, GameDefinition>,
     rooms: DashMap<String, Arc<RoomHandle>>,
+    presentation_delay_ms: u32,
 }
 
 impl GameStore {
-    pub fn new() -> Self {
+    pub fn new(presentation_delay_ms: u32) -> Self {
         let store = Self {
             inner: Arc::new(GameStoreInner {
                 definitions: DashMap::new(),
                 rooms: DashMap::new(),
+                presentation_delay_ms,
             }),
         };
         store.spawn_janitor();
@@ -261,7 +263,13 @@ impl GameStore {
         if let Some(existing) = self.inner.rooms.get(game_id) {
             return existing.clone();
         }
-        let room = RoomHandle::spawn(game_id.to_string(), setup, cols, rows);
+        let room = RoomHandle::spawn(
+            game_id.to_string(),
+            setup,
+            cols,
+            rows,
+            self.inner.presentation_delay_ms,
+        );
         self.inner.rooms.insert(game_id.to_string(), room.clone());
         info!(%game_id, "live room created");
         room
@@ -419,7 +427,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_with_different_rotation_mode_conflicts() {
-        let store = GameStore::new();
+        let store = GameStore::new(100);
         let created = store.create_game(request(true)).unwrap();
         assert!(created.setup.unwrap().rotation_enabled);
         assert!(store.create_game(request(true)).is_ok());

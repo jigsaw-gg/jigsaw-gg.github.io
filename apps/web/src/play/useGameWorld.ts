@@ -25,7 +25,9 @@ import { GameSyncSession } from '../network/syncSession.ts'
 
 import type { LocalDrag, RemoteCursor, SyncApi } from '../world/models.ts'
 import { createLocalInputApi } from '../world/localInput.ts'
+import { idFromIndex } from '../world/groups.ts'
 import { applyRemoteTickMaps } from '../world/remoteFromTick.ts'
+import type { RemotePresentationPhase } from '../world/models.ts'
 import {
   boardsEqual,
   composePaintFrame,
@@ -111,14 +113,17 @@ export function useGameWorld(
         anchorId: string
         group: string
         members: string[]
-        /** Last tick target; display pose comes from remoteHeldSmoothRef. */
-        x: number
-        y: number
+        offsetX: number
+        offsetY: number
       }
     >(),
   )
-  const remoteHeldSmoothRef = useRef(new Map<string, MousePathSmoother>())
   const remoteCursorSmoothRef = useRef(new Map<string, MousePathSmoother>())
+  const remotePresentationRef = useRef(
+    new Map<string, RemotePresentationPhase>(),
+  )
+  /** Server-authoritative lag for remote cursor/held (Welcome); fallback until join. */
+  const presentationDelayMsRef = useRef(100)
   const claimCounter = useRef(1n)
   const mergeCounter = useRef(1n)
   const sessionRef = useRef<GameSyncSession | null>(null)
@@ -142,8 +147,8 @@ export function useGameWorld(
   useEffect(() => {
     if (!built || !play || joinGeneration < 1) return
 
-    remoteHeldSmoothRef.current.clear()
     remoteCursorSmoothRef.current.clear()
+    remotePresentationRef.current.clear()
 
     const initial =
       board && board.pieces.length > 0
@@ -161,12 +166,17 @@ export function useGameWorld(
 
     const skipHeldIds = (): Set<string> => {
       const ids = new Set<string>()
+      const geo = builtRef.current
       const local = localDragRef.current
       if (local?.claimed) {
         for (const id of local.members) ids.add(id)
       }
-      for (const held of remoteHeldRef.current.values()) {
-        for (const id of held.members) ids.add(id)
+      if (geo) {
+        for (const holding of holdingsRef.current) {
+          for (const idx of holding.memberPieceIndices) {
+            ids.add(idFromIndex(idx, geo.cols))
+          }
+        }
       }
       return ids
     }
@@ -180,6 +190,10 @@ export function useGameWorld(
     let resetDragSender = () => {}
 
     const onWelcome = (welcome: Welcome) => {
+      presentationDelayMsRef.current =
+        welcome.presentationDelayMs > 0 ? welcome.presentationDelayMs : 100
+      remoteCursorSmoothRef.current.clear()
+      remotePresentationRef.current.clear()
       applyPresenceRef.current(welcome.players)
       holdingsRef.current = [...welcome.holdings]
       if (welcome.board && builtRef.current && !welcomeBoardApplied) {
@@ -209,10 +223,20 @@ export function useGameWorld(
       if (!geo || !current) return
       holdingsRef.current = [...tick.holdings]
 
+      const nextResting = applyTickBoard(
+        current,
+        tick,
+        geo.cols,
+        geo.template,
+        skipHeldIds(),
+      )
+      applyBoard(nextResting)
+
       const { nextCursors, nextHeld } = applyRemoteTickMaps({
         localPlayerId: playerRef.current.id,
         cols: geo.cols,
         rows: geo.rows,
+        resting: nextResting,
         players: tick.players.map((pose) => ({
           playerId: pose.playerId,
           cursor: pose.cursor ? sampleToPacket(pose.cursor) : null,
@@ -230,14 +254,11 @@ export function useGameWorld(
         prevCursors: remoteCursorRef.current,
         prevHeld: remoteHeldRef.current,
         cursorSmooth: remoteCursorSmoothRef.current,
-        heldSmooth: remoteHeldSmoothRef.current,
+        presentation: remotePresentationRef.current,
+        presentationDelayMs: presentationDelayMsRef.current,
       })
       remoteCursorRef.current = nextCursors
       remoteHeldRef.current = nextHeld
-
-      applyBoard(
-        applyTickBoard(current, tick, geo.cols, geo.template, skipHeldIds()),
-      )
     }
 
     const onClaimResult = (result: ClaimResult) => {
@@ -295,7 +316,7 @@ export function useGameWorld(
         remoteCursorRef.current.delete(id)
         remoteCursorSmoothRef.current.delete(id)
         remoteHeldRef.current.delete(id)
-        remoteHeldSmoothRef.current.delete(id)
+        remotePresentationRef.current.delete(id)
       }
     }
 
@@ -371,6 +392,7 @@ export function useGameWorld(
       })
 
     const lastRemoteCursorOtelAt = new Map<string, number>()
+    const lastRemotePieceOtelAt = new Map<string, number>()
     const CURSOR_OTEL_MIN_MS = 50
 
     const input = createLocalInputApi(
@@ -430,13 +452,22 @@ export function useGameWorld(
         remoteCursors: remoteCursorRef.current,
         remoteCursorSmooth: remoteCursorSmoothRef.current,
         remoteHeld: remoteHeldRef.current,
-        remoteHeldSmooth: remoteHeldSmoothRef.current,
+        presentation: remotePresentationRef.current,
         localClaimedGroup: local?.claimed ? local.group : null,
         peerNames: peerNamesRef.current,
         fallbackName: fallbackNameRef.current,
         dtSec,
         now,
       })
+
+      for (const pe of frame.presentationEvents) {
+        event('input', 'game.presentation.phase', {
+          'jigsaw.game.id': sessionId,
+          remotePlayerId: pe.playerId,
+          phase: pe.name,
+          gapPx: Math.round(pe.gapPx * 10) / 10,
+        })
+      }
 
       for (const pose of frame.remoteCursorPoses) {
         const lastOtel = lastRemoteCursorOtelAt.get(pose.id) ?? 0
@@ -449,6 +480,29 @@ export function useGameWorld(
             y: Math.round(pose.y * 10) / 10,
             targetX: Math.round(pose.targetX * 10) / 10,
             targetY: Math.round(pose.targetY * 10) / 10,
+          })
+        }
+      }
+
+      for (const pose of frame.remotePiecePoses) {
+        const key = `${pose.playerId}:${pose.anchorId}`
+        const lastOtel = lastRemotePieceOtelAt.get(key) ?? 0
+        if (now - lastOtel >= CURSOR_OTEL_MIN_MS) {
+          lastRemotePieceOtelAt.set(key, now)
+          event('input', 'piece.remote', {
+            'jigsaw.game.id': sessionId,
+            remotePlayerId: pose.playerId,
+            pieceid: pose.anchorId,
+            presentationPhase: pose.presentationPhase,
+            x: Math.round(pose.x * 10) / 10,
+            y: Math.round(pose.y * 10) / 10,
+            restX: Math.round(pose.restX * 10) / 10,
+            restY: Math.round(pose.restY * 10) / 10,
+            gapPx: Math.round(pose.gapPx * 10) / 10,
+            cursorX: Math.round(pose.cursorX * 10) / 10,
+            cursorY: Math.round(pose.cursorY * 10) / 10,
+            offsetX: Math.round(pose.offsetX * 10) / 10,
+            offsetY: Math.round(pose.offsetY * 10) / 10,
           })
         }
       }
@@ -475,8 +529,8 @@ export function useGameWorld(
       closed = true
       input.dispose()
       window.cancelAnimationFrame(frame)
-      remoteHeldSmoothRef.current.clear()
       remoteCursorSmoothRef.current.clear()
+      remotePresentationRef.current.clear()
       session.close()
       sessionRef.current = null
       setTransport(null)

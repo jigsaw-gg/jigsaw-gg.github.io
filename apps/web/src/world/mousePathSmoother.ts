@@ -84,6 +84,23 @@ export class MousePathSmoother {
     this.lastStepAt = 0
   }
 
+  /**
+   * Collapse history to the current painted pose so the next `setTarget` does
+   * not replay through stale knots (e.g. after release settle).
+   */
+  commitPresentedPose(nowMs = performance.now()): void {
+    if (!this.hasPose) return
+    this.history.length = 0
+    this.history.push({ t: nowMs, x: this.x, y: this.y })
+    this.tx = this.x
+    this.ty = this.y
+    this.vx = 0
+    this.vy = 0
+    this.brakingForTurn = false
+    this.targetSpeed = 0
+    this.lastStepAt = nowMs
+  }
+
   /** Latest absolute world target from a Tick pose (buffered, not painted yet). */
   setTarget(x: number, y: number, nowMs = performance.now()): void {
     const last = this.history[this.history.length - 1]
@@ -234,6 +251,11 @@ export class MousePathSmoother {
 
     this.x += this.vx * dt
     this.y += this.vy * dt
+    return { x: this.x, y: this.y }
+  }
+
+  paintedPose(): { x: number; y: number } | null {
+    if (!this.hasPose) return null
     return { x: this.x, y: this.y }
   }
 

@@ -56,4 +56,8 @@ pub struct Config {
     /// Percentage of impaired frames to deliver twice after the delay (0–100).
     #[arg(long, env = "NETWORK_GLITCH_DUP_PERCENT", default_value_t = 0.0)]
     pub network_glitch_dup_percent: f64,
+
+    /// Remote cursor/held presentation lag reported in Welcome (milliseconds).
+    #[arg(long, env = "PRESENTATION_DELAY_MS", default_value_t = 100)]
+    pub presentation_delay_ms: u32,
 }

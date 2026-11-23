@@ -22,10 +22,22 @@ export interface RemoteHeld {
   anchorId: string
   group: string
   members: string[]
-  /** Last tick target; display pose comes from the smoother. */
-  x: number
-  y: number
+  /** Server held anchor minus cursor (world px); applied to painted cursor. */
+  offsetX: number
+  offsetY: number
 }
+
+/** One presentation clock per remote player (cursor smoother targets). */
+export type RemotePresentationPhase =
+  | { kind: 'holding' }
+  | {
+      kind: 'settling'
+      anchorId: string
+      members: string[]
+      offsetX: number
+      offsetY: number
+    }
+  | { kind: 'tracking' }
 
 export interface BuiltGeometry {
   key: string

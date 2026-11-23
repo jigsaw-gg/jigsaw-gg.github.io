@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 interface ImportMetaEnv {
   /** BotFather bot username (no @). Prefer .env; config.json in local dev. */
   readonly VITE_TELEGRAM_BOT_USERNAME?: string
@@ -22,4 +24,11 @@ interface ImportMetaEnv {
   readonly VITE_OTEL_OTEL_EXPORTER_OTLP_ORGANIZATION?: string
   /** Semicolon-separated categories, or empty/`all` for every category. */
   readonly VITE_OTEL_ENABLED_FOR?: string
+}
+
+declare module 'virtual:web-build-meta' {
+  /** Full HEAD at bundle / dev reload (OTEL `web.commit_sha`). */
+  export const WEB_COMMIT_SHA: string
+  /** Tracked working-tree digest (OTEL `web.files_sha`). */
+  export const WEB_FILES_SHA: string
 }

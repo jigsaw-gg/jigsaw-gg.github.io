@@ -425,6 +425,9 @@ message Welcome {
   // True when this session uses two QUIC bidi streams (input + world).
   bool dual_bidi_streams = 7;
   TransportKind transport = 8;
+  // Observer-side lag behind newest Tick pose (cursor + held anchor). Complements
+  // tick_hz; clients MUST use this for remote presentation smoothing (ms).
+  uint32 presentation_delay_ms = 9;
 }
 
 // Fixed-rate (~10 Hz) consolidated world view after conflict resolution and
