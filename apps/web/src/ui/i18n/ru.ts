@@ -15,6 +15,7 @@ export const ru: Messages = {
     newPuzzle: 'Новый пазл',
     network: 'Состояние сети',
     about: 'О сайте',
+    github: 'GitHub',
     menu: 'Меню',
     close: 'Закрыть',
   },

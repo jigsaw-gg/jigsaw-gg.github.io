@@ -6,6 +6,7 @@ export const es: Messages = {
     newPuzzle: 'Nuevo puzle',
     network: 'Estado de la red',
     about: 'Acerca de',
+    github: 'GitHub',
     menu: 'Menú',
     close: 'Cerrar',
   },

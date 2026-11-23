@@ -4,6 +4,7 @@ export interface Messages {
     newPuzzle: string
     network: string
     about: string
+    github: string
     menu: string
     close: string
   }

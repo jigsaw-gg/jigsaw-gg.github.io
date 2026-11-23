@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { FullscreenButton } from './FullscreenButton.tsx'
+import { GitHubLinkButton } from './GitHubLinkButton.tsx'
 import { LanguageSwitcher } from './LanguageSwitcher.tsx'
 import { ThemeSwitcher } from './ThemeSwitcher.tsx'
 import { useI18n } from '../i18n/useI18n.ts'
@@ -135,6 +136,7 @@ export function SiteHeader() {
             Jigsaw
           </NavLink>
           <div className="topbar__tools">
+            <GitHubLinkButton />
             <FullscreenButton />
             <button
               ref={menuRef}
